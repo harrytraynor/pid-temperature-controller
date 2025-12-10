@@ -1,0 +1,564 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Play, RotateCcw, Thermometer, Flame, Settings, Wind, Sun } from 'lucide-react';
+
+const PIDLab = () => {
+  // --- State & Refs ---
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [targetTemp, setTargetTemp] = useState(60);
+  
+  // PID Constants
+  const [kp, setKp] = useState(2.0);
+  const [ki, setKi] = useState(0.05);
+  const [kd, setKd] = useState(50.0);
+
+  // Simulation State
+  const simState = useRef({
+    currentTemp: 20, // Starting at room temp
+    integral: 0,
+    lastError: 0,
+    burnerPower: 0, // 0 to 100
+    bubbles: [],
+    steam: [],
+    windParticles: [], // Lines representing wind
+    windLevel: 0,      // 0.0 to 1.0
+    sunLevel: 0.5,     // 0.0 to 1.0
+    history: [], 
+    time: 0,
+    wavePhase: 0 // For liquid sloshing
+  });
+
+  const canvasRef = useRef(null);
+  const requestRef = useRef();
+
+  // --- Constants ---
+  const DT = 0.1; // Time step
+  const MAX_HISTORY = 200;
+  const AMBIENT_TEMP = 20;
+
+  // --- Physics & PID Logic ---
+  const updatePhysics = useCallback(() => {
+    const state = simState.current;
+    
+    // 1. PID Calculation
+    const error = targetTemp - state.currentTemp;
+    
+    if (isPlaying) {
+      state.integral += error * DT;
+      // Anti-windup
+      state.integral = Math.max(-500, Math.min(500, state.integral));
+    }
+
+    const derivative = (error - state.lastError) / DT;
+    state.lastError = error;
+
+    let output = (kp * error) + (ki * state.integral) + (kd * derivative);
+    state.burnerPower = Math.max(0, Math.min(100, output));
+
+    // 2. Environmental Factors (Random Walk)
+    if (isPlaying) {
+        // Wind fluctuates faster
+        state.windLevel += (Math.random() - 0.5) * 0.05;
+        state.windLevel = Math.max(0, Math.min(1, state.windLevel));
+        
+        // Sun fluctuates slower
+        state.sunLevel += (Math.random() - 0.5) * 0.01;
+        state.sunLevel = Math.max(0, Math.min(1, state.sunLevel));
+    }
+
+    // 3. Thermal Physics
+    // Burner Heat
+    const heatGain = (state.burnerPower / 100) * 0.9; 
+    
+    // Sun Heat (Adds small constant heat)
+    const sunHeat = state.sunLevel * 0.15; 
+
+    // Standard Loss (Newton's Law)
+    let heatLossFactor = 0.02;
+    // Wind Effect (Increases heat loss coefficient significantly)
+    heatLossFactor += state.windLevel * 0.03; 
+
+    const heatLoss = (state.currentTemp - AMBIENT_TEMP) * heatLossFactor;
+
+    if (isPlaying) {
+      state.currentTemp += (heatGain + sunHeat - heatLoss) * DT;
+      state.wavePhase += 0.1; // Move the liquid wave
+
+      // Boiling limit
+      if (state.currentTemp > 100) {
+        state.currentTemp -= (state.currentTemp - 100) * 0.6; // Energy loss to phase change
+        state.wavePhase += 0.2;
+      }
+    }
+
+    // 4. Particle Systems
+    // Spawn Wind Particles
+    if (isPlaying && Math.random() < state.windLevel * 0.3) {
+        state.windParticles.push({
+            x: -20,
+            y: 50 + Math.random() * 200,
+            length: 20 + Math.random() * 40,
+            speed: 5 + state.windLevel * 10,
+            life: 1.0
+        });
+    }
+
+    // Spawn Bubbles
+    if (state.currentTemp > 90 && isPlaying) {
+      const boilIntensity = Math.max(0, state.currentTemp - 90);
+      if (Math.random() < boilIntensity * 0.08) {
+        state.bubbles.push({
+          x: 35 + Math.random() * 30,
+          y: 180,
+          r: 2 + Math.random() * 4,
+          speed: 1 + Math.random() * 3,
+          wobbleOffset: Math.random() * Math.PI * 2
+        });
+      }
+    }
+    
+    // Spawn Steam
+    if (state.currentTemp > 80 && isPlaying) {
+        const steamIntensity = Math.max(0, state.currentTemp - 80);
+        // Wind blows steam away!
+        const windBias = state.windLevel * 2; 
+
+        if (Math.random() < steamIntensity * 0.08) {
+            state.steam.push({
+                x: 35 + Math.random() * 30,
+                y: 40,
+                vx: (Math.random() - 0.5) * 0.8 + windBias, 
+                vy: -1.5 - Math.random(),
+                life: 1.0,
+                size: 3 + Math.random() * 5
+            });
+        }
+    }
+
+    // Update Particles
+    state.bubbles.forEach(b => {
+        b.y -= b.speed;
+        b.x += Math.sin(state.time * 0.1 + b.wobbleOffset) * 0.5;
+    });
+    
+    state.steam.forEach(s => {
+        s.x += s.vx;
+        s.y += s.vy;
+        s.vx += state.windLevel * 0.1; // Wind accelerates existing steam
+        s.life -= 0.015;
+        s.size += 0.1;
+    });
+
+    state.windParticles.forEach(w => {
+        w.x += w.speed;
+        w.life -= 0.01;
+    });
+
+    // Cleanup
+    state.bubbles = state.bubbles.filter(b => b.y > 40);
+    state.steam = state.steam.filter(s => s.life > 0);
+    state.windParticles = state.windParticles.filter(w => w.x < 400 && w.life > 0);
+
+    // 5. History
+    if (state.time % 5 === 0) {
+      state.history.push({ temp: state.currentTemp, setpoint: targetTemp });
+      if (state.history.length > MAX_HISTORY) state.history.shift();
+    }
+    state.time++;
+
+  }, [targetTemp, kp, ki, kd, isPlaying]);
+
+  // --- Rendering ---
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const state = simState.current;
+
+    // Clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const tubeWidth = 60;
+    const tubeHeight = 160;
+    const tubeTop = 60;
+    
+    // --- 0. Environmental Background ---
+    
+    // Sun
+    if (state.sunLevel > 0) {
+        const sunX = 40;
+        const sunY = 40;
+        const sunRadius = 20 + state.sunLevel * 10;
+        
+        const grd = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, sunRadius * 2);
+        grd.addColorStop(0, `rgba(255, 255, 200, ${state.sunLevel})`);
+        grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, sunRadius * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sun Core
+        ctx.fillStyle = `rgba(255, 220, 100, ${state.sunLevel * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(sunX, sunY, sunRadius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // --- 1. Draw Burner Flame ---
+    if (state.burnerPower > 0) {
+      const powerRatio = state.burnerPower / 100;
+      const flameH = powerRatio * 70;
+      const flicker = Math.random() * 5;
+      const flameBaseY = tubeTop + tubeHeight + 25;
+      
+      // Wind deflects flame slightly
+      const flameTilt = state.windLevel * 20; 
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'orange';
+
+      // Outer Flame
+      ctx.beginPath();
+      ctx.moveTo(centerX - 12, flameBaseY);
+      ctx.quadraticCurveTo(centerX + flameTilt, flameBaseY - flameH - 10 - flicker, centerX + 12, flameBaseY);
+      ctx.fillStyle = `rgba(255, ${100 + Math.random() * 50}, 0, ${0.4 + powerRatio * 0.4})`;
+      ctx.fill();
+
+      // Inner Flame
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = 'yellow';
+      ctx.beginPath();
+      ctx.moveTo(centerX - 8, flameBaseY);
+      ctx.quadraticCurveTo(centerX + flameTilt * 0.8, flameBaseY - (flameH * 0.7) - flicker, centerX + 8, flameBaseY);
+      ctx.fillStyle = `rgba(255, 200, 0, ${0.5 + powerRatio * 0.5})`;
+      ctx.fill();
+
+      // Core Flame
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = 'blue';
+      ctx.beginPath();
+      ctx.moveTo(centerX - 5, flameBaseY);
+      ctx.quadraticCurveTo(centerX + flameTilt * 0.3, flameBaseY - (flameH * 0.3), centerX + 5, flameBaseY);
+      ctx.fillStyle = `rgba(100, 200, 255, 0.8)`;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // --- 2. Draw Steam ---
+    state.steam.forEach(s => {
+        const globalX = centerX - (tubeWidth/2) + s.x;
+        const globalY = tubeTop + s.y;
+        ctx.beginPath();
+        ctx.arc(globalX, globalY, s.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${s.life * 0.3})`;
+        ctx.fill();
+    });
+
+    // --- 3. Draw Liquid ---
+    const tRatio = Math.min(1, Math.max(0, (state.currentTemp - 20) / 80));
+    const r = Math.floor(40 + (215 * tRatio));
+    const g = Math.floor(150 - (100 * tRatio));
+    const b = Math.floor(255 - (200 * tRatio));
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(centerX - tubeWidth/2, tubeTop, tubeWidth, tubeHeight, [0, 0, 30, 30]);
+    ctx.clip();
+
+    // Liquid Path with Wave
+    ctx.beginPath();
+    const liquidTopY = tubeTop + 40;
+    ctx.moveTo(centerX - tubeWidth/2, tubeHeight + tubeTop);
+    ctx.lineTo(centerX - tubeWidth/2, liquidTopY);
+    
+    // Wave
+    for (let x = 0; x <= tubeWidth; x+=2) {
+        const waveY = liquidTopY + Math.sin((x + state.wavePhase * 20) * 0.1) * (2 + (state.burnerPower/100)*2);
+        ctx.lineTo(centerX - tubeWidth/2 + x, waveY);
+    }
+    
+    ctx.lineTo(centerX + tubeWidth/2, tubeHeight + tubeTop);
+    ctx.closePath();
+
+    // Gradient Fill
+    const grad = ctx.createLinearGradient(centerX, tubeTop, centerX, tubeTop + tubeHeight);
+    grad.addColorStop(0, `rgb(${r},${g},${b})`);
+    grad.addColorStop(1, `rgb(${Math.max(0, r-50)},${Math.max(0, g-50)},${Math.max(0, b-50)})`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Bubbles
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    state.bubbles.forEach(b => {
+      const globalX = centerX - (tubeWidth/2) + b.x - 25; 
+      const globalY = tubeTop + b.y;
+      ctx.beginPath();
+      ctx.arc(globalX, globalY, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      // Bubble highlight
+      ctx.beginPath();
+      ctx.arc(globalX - b.r*0.3, globalY - b.r*0.3, b.r*0.2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    });
+
+    ctx.restore();
+
+    // --- 4. Draw Glass Tube Outline ---
+    ctx.beginPath();
+    ctx.roundRect(centerX - tubeWidth/2, tubeTop, tubeWidth, tubeHeight, [0, 0, 30, 30]);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Highlights
+    ctx.beginPath();
+    ctx.moveTo(centerX - tubeWidth/2 + 8, tubeTop + 10);
+    ctx.lineTo(centerX - tubeWidth/2 + 8, tubeTop + tubeHeight - 20);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX + tubeWidth/2 - 8, tubeTop + 20);
+    ctx.lineTo(centerX + tubeWidth/2 - 8, tubeTop + tubeHeight - 40);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // --- 5. Burner Base ---
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(centerX - 12, tubeTop + tubeHeight + 25, 24, 35);
+    ctx.beginPath();
+    ctx.moveTo(centerX - 35, tubeTop + tubeHeight + 60);
+    ctx.lineTo(centerX + 35, tubeTop + tubeHeight + 60);
+    ctx.lineTo(centerX + 15, tubeTop + tubeHeight + 35);
+    ctx.lineTo(centerX - 15, tubeTop + tubeHeight + 35);
+    ctx.fill();
+
+    // --- 6. Draw Wind Particles ---
+    ctx.strokeStyle = 'rgba(200, 230, 255, 0.4)';
+    ctx.lineWidth = 2;
+    state.windParticles.forEach(w => {
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y);
+        // Draw a curvy line
+        ctx.quadraticCurveTo(w.x + w.length/2, w.y - 5, w.x + w.length, w.y);
+        ctx.stroke();
+    });
+
+    // --- 7. HUD Text ---
+    // Temp Box
+    ctx.font = "bold 24px monospace";
+    ctx.textAlign = "right";
+    ctx.fillStyle = state.currentTemp > 80 ? "#ef4444" : "#3b82f6";
+    ctx.fillText(`${state.currentTemp.toFixed(1)}°C`, canvas.width - 20, 40);
+    
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText("TEMPERATURE", canvas.width - 20, 55);
+
+    // Power Box
+    ctx.font = "bold 20px monospace";
+    ctx.fillStyle = "#f97316";
+    ctx.fillText(`${Math.round(state.burnerPower)}%`, canvas.width - 20, 85);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText("BURNER POWER", canvas.width - 20, 100);
+
+    // Env Box (Wind/Sun)
+    const envY = 280;
+    // Wind Bar
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "10px sans-serif";
+    ctx.fillText("WIND", canvas.width - 20, envY);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(canvas.width - 80, envY + 5, 60, 4);
+    ctx.fillStyle = "#3b82f6";
+    ctx.fillRect(canvas.width - 80, envY + 5, 60 * state.windLevel, 4);
+
+    // Sun Bar
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText("SUN", canvas.width - 20, envY + 25);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(canvas.width - 80, envY + 30, 60, 4);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillRect(canvas.width - 80, envY + 30, 60 * state.sunLevel, 4);
+
+  }, []);
+
+  // --- Animation Loop ---
+  useEffect(() => {
+    const loop = () => {
+      updatePhysics();
+      draw();
+      requestRef.current = requestAnimationFrame(loop);
+    };
+    requestRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [updatePhysics, draw]);
+
+  // --- Helper to Reset ---
+  const handleReset = () => {
+    simState.current.currentTemp = 20;
+    simState.current.integral = 0;
+    simState.current.lastError = 0;
+    simState.current.history = [];
+    simState.current.bubbles = [];
+  };
+
+  return (
+    <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 bg-slate-50 rounded-xl shadow-lg font-sans text-slate-700">
+      
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6 w-full border-b pb-4 border-slate-200">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Settings className="w-6 h-6 text-blue-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">PID Temperature Controller</h1>
+          <p className="text-sm text-slate-500">Tune the loop to stabilize the liquid temperature.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+        
+        {/* Left Column: Visuals */}
+        <div className="flex flex-col items-center justify-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          
+          <canvas 
+            ref={canvasRef} 
+            width={300} 
+            height={350} 
+            className="w-full max-w-[300px]"
+          />
+
+          <div className="flex gap-4 mt-4">
+            <button 
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition"
+            >
+              <Play className={`w-4 h-4 ${isPlaying ? 'fill-current' : ''}`} />
+              {isPlaying ? 'Pause' : 'Resume'}
+            </button>
+            <button 
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column: Controls & Graph */}
+        <div className="flex flex-col gap-6">
+          
+          {/* Setpoint Slider */}
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <label className="font-semibold flex items-center gap-2">
+                <Thermometer className="w-4 h-4 text-green-600" />
+                Target Temperature (Setpoint)
+              </label>
+              <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-mono font-bold">
+                {targetTemp}°C
+              </span>
+            </div>
+            <input 
+              type="range" 
+              min="20" 
+              max="110" 
+              value={targetTemp} 
+              onChange={(e) => setTargetTemp(Number(e.target.value))}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+            />
+            <div className="flex justify-between text-xs text-slate-400 mt-2">
+              <span>20°C (Room)</span>
+              <span>100°C (Boil)</span>
+              <span>110°C</span>
+            </div>
+          </div>
+
+          {/* PID Sliders */}
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              PID Constants
+            </h3>
+            
+            {/* Kp */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-slate-600">Proportional (Kp)</span>
+                <span className="font-mono text-slate-500">{kp.toFixed(1)}</span>
+              </div>
+              <input 
+                type="range" min="0" max="10" step="0.1" 
+                value={kp} onChange={(e) => setKp(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+            </div>
+
+            {/* Ki */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-slate-600">Integral (Ki)</span>
+                <span className="font-mono text-slate-500">{ki.toFixed(2)}</span>
+              </div>
+              <input 
+                type="range" min="0" max="0.5" step="0.01" 
+                value={ki} onChange={(e) => setKi(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
+            </div>
+
+            {/* Kd */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-slate-600">Derivative (Kd)</span>
+                <span className="font-mono text-slate-500">{kd.toFixed(1)}</span>
+              </div>
+              <input 
+                type="range" min="0" max="100" step="1" 
+                value={kd} onChange={(e) => setKd(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+              />
+            </div>
+          </div>
+
+          {/* Real-time Graph */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 h-40 flex items-end justify-between relative overflow-hidden">
+             <div className="absolute top-2 left-2 text-xs font-bold text-slate-400">Temperature History</div>
+             <div className="flex w-full h-full items-end gap-[1px]">
+               {simState.current.history.map((pt, i) => (
+                 <div key={i} className="flex-1 flex flex-col justify-end h-full group relative">
+                    <div 
+                        className="w-full bg-green-200 opacity-50 absolute bottom-0"
+                        style={{ height: `${(pt.setpoint / 120) * 100}%`, marginBottom: '-1px' }}
+                    />
+                    <div 
+                        className={`w-full ${pt.temp > pt.setpoint ? 'bg-red-400' : 'bg-blue-400'} rounded-t-sm transition-all duration-75`}
+                        style={{ height: `${Math.min(100, (pt.temp / 120) * 100)}%` }}
+                    />
+                 </div>
+               ))}
+             </div>
+             <div className="absolute w-full border-t border-slate-200 top-1/2 left-0 pointer-events-none"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PIDLab;
