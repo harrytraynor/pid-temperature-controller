@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PID Lab Simulator — Particle Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+<div class="flex flex-col items-center w-full max-w-4xl mx-auto p-4 bg-slate-50 rounded-xl shadow-lg font-sans text-slate-700">
+  
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-6 w-full border-b pb-4 border-slate-200">
+    <div class="p-2 bg-indigo-100 rounded-lg">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-indigo-600">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    </div>
+    <div class="flex-1">
+      <h1 class="text-2xl font-bold text-slate-800">PID Temperature Controller <span class="text-indigo-600 text-base font-medium">(Particle Engine)</span></h1>
+      <p class="text-sm text-slate-500">Metaball particle water with marching-squares mesh surface.</p>
+    </div>
+    <a href="index.html" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition border border-slate-200">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Classic Engine
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+    
+    <!-- Left Column: Visuals -->
+    <div class="flex flex-col items-center justify-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <canvas id="simCanvas" width="300" height="350" style="width:100%;max-width:300px;background:#fff;"></canvas>
+      <div class="flex gap-4 mt-4">
+        <button id="btnPlayPause" class="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">
+          <svg id="iconPause" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <svg id="iconPlay" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="btnPlayLabel">Pause</span>
+        </button>
+        <button id="btnReset" class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Right Column: Controls & Graph -->
+    <div class="flex flex-col gap-6">
+      
+      <!-- Setpoint Slider -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex justify-between items-center mb-4">
+          <label class="font-semibold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+            Target Temperature (Setpoint)
+          </label>
+          <span id="targetLabel" class="bg-green-100 text-green-800 px-2 py-1 rounded font-mono font-bold">60°C</span>
+        </div>
+        <input id="targetSlider" type="range" min="20" max="110" value="60" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"/>
+        <div class="flex justify-between text-xs text-slate-400 mt-2">
+          <span>20°C (Room)</span><span>100°C (Boil)</span><span>110°C</span>
+        </div>
+      </div>
+
+      <!-- PID Sliders -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+        <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          PID Constants
+        </h3>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Proportional (Kp)</span>
+            <span id="kpLabel" class="font-mono text-slate-500">2.0</span>
+          </div>
+          <input id="kpSlider" type="range" min="0" max="10" step="0.1" value="2.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"/>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Integral (Ki)</span>
+            <span id="kiLabel" class="font-mono text-slate-500">0.05</span>
+          </div>
+          <input id="kiSlider" type="range" min="0" max="0.5" step="0.01" value="0.05" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"/>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Derivative (Kd)</span>
+            <span id="kdLabel" class="font-mono text-slate-500">50.0</span>
+          </div>
+          <input id="kdSlider" type="range" min="0" max="100" step="1" value="50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600"/>
+        </div>
+        <div class="pt-3 mt-1 border-t border-slate-100">
+          <button id="btnAutoTune" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 transition font-semibold text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span id="btnAutoTuneLabel">Auto-Tune PID</span>
+          </button>
+          <p id="autoTuneHint" class="text-xs text-slate-400 mt-2 text-center">Automatically finds optimal Kp, Ki, Kd for the current setpoint using relay feedback.</p>
+        </div>
+      </div>
+
+      <!-- Graph -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 h-40 relative overflow-hidden">
+        <div class="absolute top-2 left-2 text-xs font-bold text-slate-400 z-10">Temperature History</div>
+        <canvas id="graphCanvas" width="400" height="140" style="width:100%;height:100%;"></canvas>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+    var simCanvas = document.getElementById('simCanvas');
+    var graphCanvas = document.getElementById('graphCanvas');
+    var ctx = simCanvas.getContext('2d');
+    var gCtx = graphCanvas.getContext('2d');
+
+    var btnPlayPause = document.getElementById('btnPlayPause');
+    var btnReset = document.getElementById('btnReset');
+    var iconPause = document.getElementById('iconPause');
+    var iconPlay = document.getElementById('iconPlay');
+    var btnPlayLabel = document.getElementById('btnPlayLabel');
+
+    var targetSlider = document.getElementById('targetSlider');
+    var targetLabel = document.getElementById('targetLabel');
+    var kpSlider = document.getElementById('kpSlider');
+    var kpLabel = document.getElementById('kpLabel');
+    var kiSlider = document.getElementById('kiSlider');
+    var kiLabel = document.getElementById('kiLabel');
+    var kdSlider = document.getElementById('kdSlider');
+    var kdLabel = document.getElementById('kdLabel');
+
+    var btnAutoTune = document.getElementById('btnAutoTune');
+    var btnAutoTuneLabel = document.getElementById('btnAutoTuneLabel');
+    var autoTuneHint = document.getElementById('autoTuneHint');
+
+    var isPlaying = true;
+    var targetTemp = 60;
+    var kp = 2.0, ki = 0.05, kd = 50.0;
+
+    // Auto-tune state (relay feedback / Ziegler-Nichols) — identical to classic
+    var autoTune = {
+        active: false, phase: 'idle', relayHigh: 80, relayLow: 0,
+        lastCross: 0, crossCount: 0, periods: [], peaks: [], valleys: [],
+        tracking: 'none', peakVal: -Infinity, valleyVal: Infinity, message: ''
+    };
+
+    // ======= SIMULATION STATE =======
+    var sim = {
+        currentTemp: 20, integral: 0, lastError: 0, burnerPower: 0,
+        flameParticles: [], embers: [], steam: [], windParticles: [],
+        splashes: [], escapeBubbles: [],
+        windLevel: 0, sunLevel: 0.5, history: [], time: 0,
+        displayTemp: 20, displayPower: 0,
+        // Particle-engine specific: water particles
+        waterParticles: [],
+        bubbleParticles: []
+    };
+
+    var DT = 0.1;
+    var MAX_HISTORY = 200;
+    var AMBIENT_TEMP = 20;
+
+    var CANVAS_W = 300;
+    var CANVAS_H = 350;
+    var CENTER_X = CANVAS_W / 2;
+    var TUBE_W = 60;
+    var TUBE_H = 160;
+    var TUBE_TOP = 60;
+    var BURNER_Y = TUBE_TOP + TUBE_H + 25;
+
+    // Tube bounds in canvas coords
+    var TUBE_L = CENTER_X - TUBE_W / 2;
+    var TUBE_R = CENTER_X + TUBE_W / 2;
+    var TUBE_BOT = TUBE_TOP + TUBE_H;
+
+    // Dynamic water surface — computed each frame from actual particle positions
+    var dynamicSurfaceY = WATER_SURFACE; // fallback
+    function computeDynamicSurface() {
+        var parts = sim.waterParticles;
+        var n = parts.length;
+        if (n === 0) { dynamicSurfaceY = WATER_SURFACE; return; }
+        // Find the average Y of the topmost ~15% of non-escaped particles
+        var ys = [];
+        for (var i = 0; i < n; i++) {
+            if (!parts[i].escaped) ys.push(parts[i].y);
+        }
+        if (ys.length === 0) { dynamicSurfaceY = WATER_SURFACE; return; }
+        ys.sort(function(a, b) { return a - b; });
+        var topCount = Math.max(3, Math.floor(ys.length * 0.15));
+        var sum = 0;
+        for (var k = 0; k < topCount; k++) sum += ys[k];
+        dynamicSurfaceY = sum / topCount;
+    }
+    // Per-x surface lookup: find nearest surface particle to a given x
+    function surfaceYAtX(x) {
+        var parts = sim.waterParticles;
+        var bestY = dynamicSurfaceY;
+        var bestDx = 999;
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i];
+            if (p.escaped) continue;
+            var adx = Math.abs(p.x - x);
+            if (adx < PARTICLE_R * 4 && p.y < dynamicSurfaceY + 15) {
+                if (adx < bestDx || (adx === bestDx && p.y < bestY)) {
+                    bestDx = adx; bestY = p.y;
+                }
+            }
+        }
+        return bestY;
+    }
+    var WATER_SURFACE = TUBE_TOP + 38;
+
+    // ======= PARTICLE SYSTEM CONSTANTS =======
+    var PARTICLE_R = 2.2;          // base radius for water metaballs
+    var GRAVITY = 0.12;
+    var VISCOSITY = 0.03;
+    var OVERLAP_STIFFNESS = 0.4;   // firm repulsion prevents pile-up
+    var COHESION = 0.008;          // light attraction keeps body together
+    var SURFACE_TENSION = 0.025;   // gentle pull on surface particles
+    var PARTICLE_SPACING = PARTICLE_R * 2.0; // rest distance between particles
+    var WALL_STIFFNESS = 0.3;
+    var SMOOTHING_R = PARTICLE_R * 3.5; // kernel radius for interactions
+    var METABALL_THRESHOLD = 0.7;  // isosurface threshold
+    var GRID_STEP = 2;             // marching-squares grid cell size
+
+    // ======= INITIALISE WATER PARTICLES =======
+    function initWaterParticles() {
+        sim.waterParticles = [];
+        sim.bubbleParticles = [];
+        // Fill the tube from surface down to bottom with a grid of particles
+        var spacing = PARTICLE_R * 1.5;
+        for (var py = WATER_SURFACE + 4; py < TUBE_BOT - 15; py += spacing) {
+            for (var px = TUBE_L + 8; px < TUBE_R - 8; px += spacing) {
+                // Small jitter to avoid grid artefacts
+                sim.waterParticles.push({
+                    x: px + (Math.random() - 0.5) * 1.5,
+                    y: py + (Math.random() - 0.5) * 1.5,
+                    vx: 0, vy: 0,
+                    density: 0,
+                    type: 'water',
+                    escaped: false
+                });
+            }
+        }
+    }
+    initWaterParticles();
+
+    // ======= UI BINDINGS (identical) =======
+    targetSlider.addEventListener('input', function() {
+        targetTemp = Number(this.value);
+        targetLabel.textContent = targetTemp + '\u00B0C';
+    });
+    kpSlider.addEventListener('input', function() { kp = Number(this.value); kpLabel.textContent = kp.toFixed(1); });
+    kiSlider.addEventListener('input', function() { ki = Number(this.value); kiLabel.textContent = ki.toFixed(2); });
+    kdSlider.addEventListener('input', function() { kd = Number(this.value); kdLabel.textContent = kd.toFixed(1); });
+    btnPlayPause.addEventListener('click', function() {
+        isPlaying = !isPlaying;
+        iconPause.style.display = isPlaying ? '' : 'none';
+        iconPlay.style.display = isPlaying ? 'none' : '';
+        btnPlayLabel.textContent = isPlaying ? 'Pause' : 'Resume';
+    });
+    btnReset.addEventListener('click', function() {
+        sim.currentTemp = 20; sim.integral = 0; sim.lastError = 0;
+        sim.history = []; sim.flameParticles = []; sim.embers = [];
+        sim.steam = []; sim.windParticles = []; sim.splashes = [];
+        sim.escapeBubbles = []; sim.burnerPower = 0; sim.time = 0;
+        sim.displayTemp = 20; sim.displayPower = 0;
+        initWaterParticles();
+        if (autoTune.active) stopAutoTune('Reset');
+    });
+
+    // ======= AUTO-TUNE (identical logic) =======
+    btnAutoTune.addEventListener('click', function() {
+        if (autoTune.active) stopAutoTune('Cancelled');
+        else startAutoTune();
+    });
+    function startAutoTune() {
+        autoTune.active = true; autoTune.phase = 'heat-up';
+        autoTune.crossCount = 0; autoTune.periods = []; autoTune.peaks = [];
+        autoTune.valleys = []; autoTune.lastCross = sim.time;
+        autoTune.tracking = 'none'; autoTune.peakVal = -Infinity;
+        autoTune.valleyVal = Infinity; autoTune.message = 'Heating to setpoint\u2026';
+        sim.integral = 0; sim.lastError = 0;
+        btnAutoTune.classList.remove('bg-amber-50','text-amber-700','border-amber-200','hover:bg-amber-100');
+        btnAutoTune.classList.add('bg-red-50','text-red-700','border-red-200','hover:bg-red-100');
+        btnAutoTuneLabel.textContent = 'Cancel Auto-Tune';
+        autoTuneHint.textContent = 'Running\u2026 oscillating around setpoint to measure response.';
+        kpSlider.disabled = kiSlider.disabled = kdSlider.disabled = true;
+        kpSlider.classList.add('opacity-40'); kiSlider.classList.add('opacity-40'); kdSlider.classList.add('opacity-40');
+    }
+    function stopAutoTune(reason) {
+        autoTune.active = false; autoTune.phase = 'idle'; autoTune.message = reason || '';
+        btnAutoTune.classList.remove('bg-red-50','text-red-700','border-red-200','hover:bg-red-100');
+        btnAutoTune.classList.add('bg-amber-50','text-amber-700','border-amber-200','hover:bg-amber-100');
+        btnAutoTuneLabel.textContent = 'Auto-Tune PID';
+        autoTuneHint.textContent = reason || 'Automatically finds optimal Kp, Ki, Kd for the current setpoint using relay feedback.';
+        kpSlider.disabled = kiSlider.disabled = kdSlider.disabled = false;
+        kpSlider.classList.remove('opacity-40'); kiSlider.classList.remove('opacity-40'); kdSlider.classList.remove('opacity-40');
+    }
+    function applyAutoTuneGains(ku, tu) {
+        var newKp = Math.max(0, Math.min(10, Math.round(0.6 * ku * 10) / 10));
+        var newKi = Math.max(0, Math.min(0.5, Math.round(1.2 * ku / tu * 100) / 100));
+        var newKd = Math.max(0, Math.min(100, Math.round(0.075 * ku * tu)));
+        kp = newKp; ki = newKi; kd = newKd;
+        kpSlider.value = kp; kpLabel.textContent = kp.toFixed(1);
+        kiSlider.value = ki; kiLabel.textContent = ki.toFixed(2);
+        kdSlider.value = kd; kdLabel.textContent = kd.toFixed(1);
+        sim.integral = 0; sim.lastError = 0;
+    }
+
+    // ======= HELPERS =======
+    function tubeOpenPath(c, x, y, w, h, br) {
+        var r = br || 30;
+        c.moveTo(x, y); c.lineTo(x, y + h - r);
+        c.arcTo(x, y + h, x + r, y + h, r);
+        c.lineTo(x + w - r, y + h);
+        c.arcTo(x + w, y + h, x + w, y + h - r, r);
+        c.lineTo(x + w, y);
+    }
+    function flameNoise(t, seed) {
+        return Math.sin(t * 0.37 + seed) * 0.5 + Math.sin(t * 0.71 + seed * 2.3) * 0.3 + Math.sin(t * 1.13 + seed * 0.7) * 0.2;
+    }
+
+    // Tube boundary: for a given y, return left/right x limits (accounting for rounded bottom)
+    function tubeBounds(y) {
+        var r = 30; // corner radius
+        var l = TUBE_L, ri = TUBE_R, bot = TUBE_BOT;
+        if (y > bot - r) {
+            // In the rounded bottom zone
+            var dy = y - (bot - r);
+            var dx = r - Math.sqrt(Math.max(0, r * r - dy * dy));
+            return { left: l + dx, right: ri - dx };
+        }
+        return { left: l, right: ri };
+    }
+
+    // Is a point inside the tube?
+    function insideTube(x, y) {
+        if (y < TUBE_TOP || y > TUBE_BOT) return false;
+        var b = tubeBounds(y);
+        return x >= b.left && x <= b.right;
+    }
+
+    // ======= SPH-LITE PARTICLE PHYSICS =======
+    function updateParticles() {
+        var s = sim;
+        var parts = s.waterParticles;
+        var n = parts.length;
+        var i, j, p, q, dx, dy, dist, overlap;
+
+        // Temperature-driven agitation
+        var tRatio = Math.max(0, (s.currentTemp - 20) / 80);
+        var boilFactor = s.currentTemp > 90 ? (s.currentTemp - 90) / 10 : 0;
+        // Cubic ramp below 70°C keeps it calm; linear ramp 70-100°C gets vigorous fast
+        var lowPhase = Math.min(tRatio, 0.625); // 0→0.625 maps to 20→70°C
+        var highPhase = Math.max(0, tRatio - 0.625) / 0.375; // 0→1 maps to 70→100°C
+        var agitation = lowPhase * lowPhase * lowPhase * 0.02 + highPhase * 0.6 + boilFactor * 1.5;
+        // Light damping — water is thin (0.97 cold → 0.99 boiling)
+        var damping = 0.97 + highPhase * 0.02;
+
+        // Compute forces: soft overlap repulsion + cohesion + viscosity + gravity
+        // First pass: count neighbors for surface tension
+        var neighborCount = new Int32Array(n);
+        for (i = 0; i < n; i++) {
+            p = parts[i];
+            if (p.type === 'bubble') continue;
+            p._cmx = 0; p._cmy = 0; // center-of-mass of neighbors
+            var nc = 0;
+            for (j = 0; j < n; j++) {
+                if (i === j) continue;
+                q = parts[j];
+                dx = p.x - q.x; dy = p.y - q.y;
+                if (dx * dx + dy * dy < SMOOTHING_R * SMOOTHING_R) {
+                    p._cmx += q.x; p._cmy += q.y;
+                    nc++;
+                }
+            }
+            neighborCount[i] = nc;
+            if (nc > 0) { p._cmx /= nc; p._cmy /= nc; }
+        }
+
+        for (i = 0; i < n; i++) {
+            p = parts[i];
+            if (p.type === 'bubble') continue;
+            var fx = 0, fy = 0;
+
+            for (j = i + 1; j < n; j++) {
+                q = parts[j];
+                dx = p.x - q.x; dy = p.y - q.y;
+                dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Soft repulsion — only when closer than rest spacing
+                if (dist < PARTICLE_SPACING && dist > 0.01) {
+                    var overlap = 1 - dist / PARTICLE_SPACING;
+                    var repulse = OVERLAP_STIFFNESS * overlap * overlap;
+                    var nx = dx / dist, ny = dy / dist;
+                    fx += nx * repulse;
+                    fy += ny * repulse;
+                    if (q.type !== 'bubble') {
+                        q.vx -= nx * repulse;
+                        q.vy -= ny * repulse;
+                    }
+                }
+                // Gentle cohesion — attract at medium range (makes it feel liquid)
+                else if (dist < SMOOTHING_R && dist > PARTICLE_SPACING) {
+                    var cw = (dist - PARTICLE_SPACING) / (SMOOTHING_R - PARTICLE_SPACING);
+                    var attract = COHESION * (1 - cw);
+                    var anx = dx / dist, any = dy / dist;
+                    fx -= anx * attract;
+                    fy -= any * attract;
+                    if (q.type !== 'bubble') {
+                        q.vx += anx * attract;
+                        q.vy += any * attract;
+                    }
+                }
+
+                // Viscosity — smooth out velocity differences within kernel
+                if (dist < SMOOTHING_R && dist > 0.1) {
+                    var w = 1 - dist / SMOOTHING_R;
+                    var dvx = VISCOSITY * (q.vx - p.vx) * w;
+                    var dvy = VISCOSITY * (q.vy - p.vy) * w;
+                    fx += dvx; fy += dvy;
+                    if (q.type !== 'bubble') {
+                        q.vx -= dvx; q.vy -= dvy;
+                    }
+                }
+            }
+
+            // Surface tension: particles with fewer neighbors get pulled toward neighbor center
+            // (creates a smooth surface boundary instead of loose spray)
+            if (neighborCount[i] > 0 && neighborCount[i] < 8) {
+                var stStrength = SURFACE_TENSION * (1 - neighborCount[i] / 8);
+                fx += (p._cmx - p.x) * stStrength;
+                fy += (p._cmy - p.y) * stStrength;
+            }
+
+            // Constant gravity — the primary settling force
+            fy += GRAVITY;
+
+            // Thermal agitation (random kicks — near zero at low temps)
+            if (isPlaying && agitation > 0.001) {
+                fx += (Math.random() - 0.5) * agitation;
+                fy += (Math.random() - 0.5) * agitation * 0.5;
+            }
+            // Convection: starts gently at 70°C, strong by 90°C
+            if (isPlaying && s.burnerPower > 5 && highPhase > 0) {
+                var heightRatio = Math.max(0, (TUBE_BOT - p.y) / TUBE_H);
+                var convForce = (s.burnerPower / 100) * 0.1 * highPhase * (0.3 + heightRatio * 0.7);
+                fy -= convForce;
+                fx += (Math.random() - 0.5) * convForce * 0.4;
+            }
+            // Boil agitation — violent at 95°C+
+            if (isPlaying && boilFactor > 0) {
+                fx += (Math.random() - 0.5) * boilFactor * 0.7;
+                fy += (Math.random() - 0.5) * boilFactor * 0.6;
+            }
+
+            p.vx = (p.vx + fx) * damping;
+            p.vy = (p.vy + fy) * damping;
+        }
+
+        // Integrate positions and enforce tube boundary
+        for (i = n - 1; i >= 0; i--) {
+            p = parts[i];
+            if (!isPlaying && p.type !== 'bubble') continue;
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Particles above the tube top are free-flying (no wall constraints)
+            if (p.y < TUBE_TOP) {
+                // Delete particles that leave canvas bounds entirely
+                if (p.y < -30 || p.x < -30 || p.x > CANVAS_W + 30) {
+                    parts.splice(i, 1);
+                    n--;
+                    continue;
+                }
+                p.escaped = true;
+                // Escaped particles re-entering the tube lose escaped status
+                if (p.y >= TUBE_TOP && insideTube(p.x, p.y)) {
+                    p.escaped = false;
+                }
+                continue; // skip wall enforcement for escaped particles
+            }
+            p.escaped = false;
+
+            // Tube walls (only for particles inside the tube)
+            var bounds = tubeBounds(p.y);
+            var margin = PARTICLE_R;
+            if (p.x < bounds.left + margin) { p.x = bounds.left + margin; p.vx = Math.abs(p.vx) * WALL_STIFFNESS; }
+            if (p.x > bounds.right - margin) { p.x = bounds.right - margin; p.vx = -Math.abs(p.vx) * WALL_STIFFNESS; }
+            // Bottom
+            if (p.y > TUBE_BOT - margin - 15) {
+                var bnd = tubeBounds(p.y);
+                if (p.y > TUBE_BOT - margin) { p.y = TUBE_BOT - margin; p.vy = -Math.abs(p.vy) * WALL_STIFFNESS; }
+            }
+            // Top: surface tension at low temps, particles can escape at high temps
+            if (p.y < WATER_SURFACE && p.type === 'water') {
+                if (s.currentTemp < 75) {
+                    // Strong surface tension at low temps — keeps water contained
+                    p.vy += 0.12;
+                } else {
+                    // Weaker pull at high temps — water can splash over the lip
+                    var escapeEase = Math.min(1, (s.currentTemp - 75) / 25);
+                    p.vy += 0.12 * (1 - escapeEase * 0.85);
+                }
+            }
+            // Delete particles that leave canvas bounds (bottom/sides only, top handled above)
+            if (p.y > CANVAS_H + 20 || p.x < -20 || p.x > CANVAS_W + 20) {
+                parts.splice(i, 1);
+                n--;
+                continue;
+            }
+        }
+
+        // === Bubble particles ===
+        // Spawn bubbles at the heated bottom
+        if (isPlaying && s.currentTemp > 50) {
+            var bIntensity = Math.max(0, (s.currentTemp - 50) / 50);
+            var bChance = bIntensity * 0.1;
+            if (s.currentTemp > 95) bChance += 0.2;
+            if (Math.random() < bChance && s.bubbleParticles.length < 30) {
+                var bx = TUBE_L + 10 + Math.random() * (TUBE_W - 20);
+                s.bubbleParticles.push({
+                    x: bx, y: TUBE_BOT - 20,
+                    vx: 0, vy: -(0.8 + Math.random() * 1.5 + bIntensity * 1.5),
+                    r: 2 + Math.random() * 2 + bIntensity * 1.5,
+                    wobble: Math.random() * Math.PI * 2,
+                    life: 1.0
+                });
+            }
+        }
+
+        // Update bubble particles
+        for (i = s.bubbleParticles.length - 1; i >= 0; i--) {
+            var b = s.bubbleParticles[i];
+            b.wobble += 0.04;
+            b.x += Math.sin(b.wobble) * 0.5;
+            b.y += b.vy;
+            b.r *= 1.001;
+
+            // Push nearby water particles outward (displacement)
+            for (j = 0; j < parts.length; j++) {
+                q = parts[j];
+                dx = q.x - b.x; dy = q.y - b.y;
+                dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < b.r * 3 && dist > 0.1) {
+                    var push = (1 - dist / (b.r * 3)) * 0.5;
+                    q.vx += (dx / dist) * push;
+                    q.vy += (dy / dist) * push;
+                }
+            }
+
+            // Pop at surface (use dynamic water level)
+            if (b.y < dynamicSurfaceY + 5) {
+                // Splash droplets at high temps
+                if (s.currentTemp > 85) {
+                    var sf = (s.currentTemp - 85) / 15;
+                    var nd = Math.random() < sf * 0.5 ? Math.floor(1 + Math.random() * 3 * sf) : 0;
+                    for (var di = 0; di < nd; di++) {
+                        s.splashes.push({
+                            x: b.x, y: b.y,
+                            vx: (Math.random() - 0.5) * (2 + sf * 3),
+                            vy: -(2 + Math.random() * 4 * sf),
+                            r: 1 + Math.random() * 2, life: 1.0,
+                            gravity: 0.12
+                        });
+                    }
+                    if (s.currentTemp > 95 && Math.random() < sf * 0.2) {
+                        s.escapeBubbles.push({
+                            x: b.x, y: b.y,
+                            vx: (Math.random() - 0.5) * 1.5,
+                            vy: -(1.5 + Math.random() * 2.5 * sf),
+                            r: b.r * 0.6, life: 1.0
+                        });
+                    }
+                }
+                // Disturb surface particles (fling them up harder)
+                for (j = 0; j < parts.length; j++) {
+                    q = parts[j];
+                    dx = q.x - b.x;
+                    if (Math.abs(dx) < b.r * 5 && q.y < dynamicSurfaceY + 20) {
+                        var flingStr = (1 - Math.abs(dx) / (b.r * 5)) * (0.5 + boilFactor * 0.8);
+                        q.vy -= flingStr;
+                        q.vx += (dx > 0 ? 1 : -1) * flingStr * 0.3; // lateral splash
+                    }
+                }
+                // At very high temps, bubble pops can eject water particles upward
+                if (s.currentTemp > 88 && Math.random() < boilFactor * 0.3) {
+                    var ejCount = 1 + Math.floor(Math.random() * 2 * boilFactor);
+                    for (var ej = 0; ej < ejCount; ej++) {
+                        s.splashes.push({
+                            x: b.x + (Math.random() - 0.5) * b.r * 2,
+                            y: b.y,
+                            vx: (Math.random() - 0.5) * (1.5 + boilFactor * 2),
+                            vy: -(1.5 + Math.random() * 3 * boilFactor),
+                            r: 1 + Math.random() * 1.5, life: 1.0, gravity: 0.14
+                        });
+                    }
+                }
+                s.bubbleParticles.splice(i, 1);
+            }
+
+            // Tube bounds for bubbles
+            var bb = tubeBounds(b.y);
+            if (b.x < bb.left + b.r) b.x = bb.left + b.r;
+            if (b.x > bb.right - b.r) b.x = bb.right - b.r;
+        }
+    }
+
+    // ======= METABALL FIELD & MARCHING SQUARES =======
+    // An offscreen buffer for the metaball field
+    var fieldW = Math.ceil(CANVAS_W / GRID_STEP) + 2;
+    var fieldH = Math.ceil(350 / GRID_STEP) + 2;
+    var field = new Float32Array(fieldW * fieldH);
+
+    function computeField() {
+        var parts = sim.waterParticles;
+        var n = parts.length;
+        // Clear
+        for (var k = 0; k < field.length; k++) field[k] = 0;
+        // Accumulate metaball contributions
+        var invStep = 1 / GRID_STEP;
+        var influence = PARTICLE_R * 3.5;
+        var iGrid = Math.ceil(influence * invStep);
+
+        for (var pi = 0; pi < n; pi++) {
+            var p = parts[pi];
+            var gx = Math.round(p.x * invStep);
+            var gy = Math.round(p.y * invStep);
+            for (var dy = -iGrid; dy <= iGrid; dy++) {
+                for (var dx = -iGrid; dx <= iGrid; dx++) {
+                    var ix = gx + dx;
+                    var iy = gy + dy;
+                    if (ix < 0 || ix >= fieldW || iy < 0 || iy >= fieldH) continue;
+                    var wx = ix * GRID_STEP - p.x;
+                    var wy = iy * GRID_STEP - p.y;
+                    var d2 = wx * wx + wy * wy;
+                    var r2 = influence * influence;
+                    if (d2 < r2) {
+                        var w = 1 - d2 / r2;
+                        field[iy * fieldW + ix] += w * w;
+                    }
+                }
+            }
+        }
+    }
+
+    // Marching squares to extract the isosurface contour
+    function marchingSurface(threshold) {
+        var segments = [];
+        for (var gy = 0; gy < fieldH - 1; gy++) {
+            for (var gx = 0; gx < fieldW - 1; gx++) {
+                var v0 = field[gy * fieldW + gx];
+                var v1 = field[gy * fieldW + gx + 1];
+                var v2 = field[(gy + 1) * fieldW + gx + 1];
+                var v3 = field[(gy + 1) * fieldW + gx];
+
+                var idx = 0;
+                if (v0 >= threshold) idx |= 1;
+                if (v1 >= threshold) idx |= 2;
+                if (v2 >= threshold) idx |= 4;
+                if (v3 >= threshold) idx |= 8;
+
+                if (idx === 0 || idx === 15) continue;
+
+                var x0 = gx * GRID_STEP, y0 = gy * GRID_STEP;
+                var x1 = (gx + 1) * GRID_STEP, y1 = (gy + 1) * GRID_STEP;
+
+                // Interpolate edge crossings
+                function lerp(a, b, va, vb) {
+                    var t = (threshold - va) / (vb - va + 0.0001);
+                    t = Math.max(0, Math.min(1, t));
+                    return a + t * (b - a);
+                }
+
+                var top    = { x: lerp(x0, x1, v0, v1), y: y0 };
+                var right  = { x: x1, y: lerp(y0, y1, v1, v2) };
+                var bottom = { x: lerp(x0, x1, v3, v2), y: y1 };
+                var left   = { x: x0, y: lerp(y0, y1, v0, v3) };
+
+                // Standard marching squares lookup
+                var edges = MS_TABLE[idx];
+                if (edges) {
+                    for (var ei = 0; ei < edges.length; ei += 2) {
+                        var pts = [top, right, bottom, left];
+                        segments.push(pts[edges[ei]], pts[edges[ei + 1]]);
+                    }
+                }
+            }
+        }
+        return segments;
+    }
+
+    // Marching squares edge lookup table (edge indices: 0=top, 1=right, 2=bottom, 3=left)
+    var MS_TABLE = [];
+    MS_TABLE[0] = null; MS_TABLE[15] = null;
+    MS_TABLE[1] = [0,3]; MS_TABLE[2] = [0,1]; MS_TABLE[3] = [1,3];
+    MS_TABLE[4] = [1,2]; MS_TABLE[5] = [0,3,1,2]; MS_TABLE[6] = [0,2];
+    MS_TABLE[7] = [2,3]; MS_TABLE[8] = [2,3]; MS_TABLE[9] = [0,2];
+    MS_TABLE[10] = [0,1,2,3]; MS_TABLE[11] = [1,2]; MS_TABLE[12] = [1,3];
+    MS_TABLE[13] = [0,1]; MS_TABLE[14] = [0,3];
+
+    // ======= PID + THERMAL PHYSICS (identical to classic) =======
+    function updatePhysics() {
+        var s = sim;
+        var error = targetTemp - s.currentTemp;
+        if (isPlaying) {
+            s.integral += error * DT;
+            s.integral = Math.max(-500, Math.min(500, s.integral));
+        }
+        var derivative = (error - s.lastError) / DT;
+        s.lastError = error;
+
+        var targetPower;
+        if (autoTune.active && isPlaying) {
+            var at = autoTune;
+            if (at.phase === 'heat-up') {
+                targetPower = at.relayHigh;
+                if (s.currentTemp >= targetTemp - 1) {
+                    at.phase = 'relay'; at.lastCross = s.time; at.tracking = 'up'; at.peakVal = s.currentTemp;
+                    at.message = 'Relay cycling (0/4 crossings)\u2026';
+                }
+            } else if (at.phase === 'relay') {
+                var above = s.currentTemp >= targetTemp;
+                targetPower = above ? at.relayLow : at.relayHigh;
+                if (at.tracking === 'up') {
+                    if (s.currentTemp > at.peakVal) at.peakVal = s.currentTemp;
+                    if (above && s.currentTemp < at.peakVal - 0.2) { at.peaks.push(at.peakVal); at.tracking = 'down'; at.valleyVal = s.currentTemp; }
+                } else if (at.tracking === 'down') {
+                    if (s.currentTemp < at.valleyVal) at.valleyVal = s.currentTemp;
+                    if (!above && s.currentTemp > at.valleyVal + 0.2) { at.valleys.push(at.valleyVal); at.tracking = 'up'; at.peakVal = s.currentTemp; }
+                }
+                var totalPV = at.peaks.length + at.valleys.length;
+                if (totalPV > at.crossCount) {
+                    if (totalPV > 1) at.periods.push(s.time - at.lastCross);
+                    at.lastCross = s.time; at.crossCount = totalPV;
+                    at.message = 'Relay cycling (' + Math.floor(at.crossCount / 2) + '/2 cycles)\u2026';
+                }
+                if (at.peaks.length >= 2 && at.valleys.length >= 2 && at.periods.length >= 3) {
+                    var avgPeak = 0, avgValley = 0;
+                    for (var pi = 0; pi < at.peaks.length; pi++) avgPeak += at.peaks[pi]; avgPeak /= at.peaks.length;
+                    for (var vi = 0; vi < at.valleys.length; vi++) avgValley += at.valleys[vi]; avgValley /= at.valleys.length;
+                    var amplitude = (avgPeak - avgValley) / 2;
+                    var avgPeriod = 0;
+                    for (var ti = 0; ti < at.periods.length; ti++) avgPeriod += at.periods[ti];
+                    avgPeriod = (avgPeriod / at.periods.length) * 2;
+                    if (amplitude > 0.1) {
+                        var d = at.relayHigh - at.relayLow;
+                        applyAutoTuneGains((4 * d) / (Math.PI * amplitude), avgPeriod);
+                        stopAutoTune('\u2705 Tuned! Kp=' + kp.toFixed(1) + ' Ki=' + ki.toFixed(2) + ' Kd=' + kd.toFixed(1));
+                    } else stopAutoTune('\u26A0 Oscillation too small.');
+                }
+                if (s.time - at.lastCross > 5000) stopAutoTune('\u26A0 Timed out.');
+            }
+            if (targetPower === undefined) targetPower = 0;
+        } else {
+            var output = (kp * error) + (ki * s.integral) + (kd * derivative);
+            targetPower = Math.max(0, Math.min(100, output));
+        }
+
+        var maxRamp = autoTune.active ? 4.0 : 1.5;
+        var diff = targetPower - s.burnerPower;
+        if (diff > maxRamp) diff = maxRamp;
+        if (diff < -maxRamp) diff = -maxRamp;
+        s.burnerPower += diff;
+
+        if (isPlaying) {
+            s.windLevel += (Math.random() - 0.5) * 0.05;
+            s.windLevel = Math.max(0, Math.min(1, s.windLevel));
+            s.sunLevel += (Math.random() - 0.5) * 0.01;
+            s.sunLevel = Math.max(0, Math.min(1, s.sunLevel));
+        }
+        var heatGain = (s.burnerPower / 100) * 2.5;
+        var sunHeat = s.sunLevel * 0.15;
+        var heatLossFactor = 0.02 + s.windLevel * 0.03;
+        var heatLoss = (s.currentTemp - AMBIENT_TEMP) * heatLossFactor;
+        if (s.currentTemp > 100) heatLoss += (s.currentTemp - 100) * 0.3;
+        if (isPlaying) {
+            s.currentTemp += (heatGain + sunHeat - heatLoss) * DT;
+            if (s.currentTemp > 110) s.currentTemp = 110;
+        }
+        var tRatio = Math.min(1, Math.max(0, (s.currentTemp - 20) / 80));
+
+        // Flame particles
+        if (isPlaying && s.burnerPower > 0) {
+            var fpw = s.burnerPower / 100;
+            var numFlame = Math.floor(1 + fpw * 3 + Math.random() * 2 * fpw);
+            for (var fi = 0; fi < numFlame; fi++) {
+                var angle = -Math.PI / 2 + (Math.random() - 0.5) * (0.6 + s.windLevel * 0.8);
+                var spd = 1.5 + Math.random() * 3 * fpw;
+                s.flameParticles.push({
+                    x: CENTER_X + (Math.random() - 0.5) * 16, y: BURNER_Y,
+                    vx: Math.cos(angle) * spd + s.windLevel * 1.5, vy: Math.sin(angle) * spd,
+                    life: 0.6 + Math.random() * 0.4, size: 3 + Math.random() * 5 * fpw,
+                    heat: 0.5 + Math.random() * 0.5
+                });
+            }
+            if (fpw > 0.3 && Math.random() < fpw * 0.3) {
+                s.embers.push({
+                    x: CENTER_X + (Math.random() - 0.5) * 12, y: BURNER_Y - 5,
+                    vx: (Math.random() - 0.5) * 3 + s.windLevel * 2, vy: -(2 + Math.random() * 4 * fpw),
+                    life: 1.0, size: 0.8 + Math.random() * 1.5
+                });
+            }
+        }
+        // Steam from water surface (spawns at actual water level)
+        if (s.currentTemp > 80 && isPlaying) {
+            var si = Math.max(0, s.currentTemp - 80);
+            var wb = s.windLevel * 2;
+            if (Math.random() < si * 0.08) {
+                var steamX = TUBE_L + 10 + Math.random() * (TUBE_W - 20);
+                var steamSurfY = surfaceYAtX(steamX);
+                s.steam.push({
+                    x: steamX,
+                    y: steamSurfY + (Math.random() - 0.5) * 3,
+                    vx: (Math.random() - 0.5) * 0.8 + wb, vy: -1.0 - Math.random() * 0.8,
+                    life: 1.0, size: 2 + Math.random() * 4
+                });
+            }
+        }
+        // Wind particles
+        if (isPlaying && Math.random() < s.windLevel * 0.3) {
+            s.windParticles.push({ x: -20, y: 50 + Math.random() * 200, len: 20 + Math.random() * 40, speed: 5 + s.windLevel * 10, life: 1.0 });
+        }
+        // Spontaneous boil sputtering
+        if (isPlaying && s.currentTemp > 92) {
+            var spitForce = (s.currentTemp - 92) / 8;
+            if (Math.random() < spitForce * 0.08) {
+                var spitX = TUBE_L + 10 + Math.random() * (TUBE_W - 20);
+                var spitSurfY = surfaceYAtX(spitX);
+                var numSpits = 2 + Math.floor(Math.random() * 4 * spitForce);
+                for (var si2 = 0; si2 < numSpits; si2++) {
+                    s.splashes.push({
+                        x: spitX + (Math.random() - 0.5) * 8, y: spitSurfY,
+                        vx: (Math.random() - 0.5) * (3 + spitForce * 4), vy: -(3 + Math.random() * 5 * spitForce),
+                        r: 0.8 + Math.random() * 2, life: 1.0, gravity: 0.12
+                    });
+                }
+            }
+        }
+
+        // Update non-water particles
+        var i;
+        for (i = 0; i < s.flameParticles.length; i++) {
+            var fp = s.flameParticles[i];
+            fp.x += fp.vx; fp.y += fp.vy; fp.vy -= 0.05; fp.vx += s.windLevel * 0.15;
+            fp.vx *= 0.98; fp.life -= 0.025; fp.size *= 0.98; fp.heat -= 0.015;
+        }
+        for (i = 0; i < s.embers.length; i++) {
+            var em = s.embers[i];
+            em.x += em.vx; em.y += em.vy; em.vy += 0.06; em.vx += s.windLevel * 0.1;
+            em.life -= 0.015; em.size *= 0.995;
+        }
+        for (i = 0; i < s.steam.length; i++) {
+            var p = s.steam[i]; p.x += p.vx; p.y += p.vy; p.vx += s.windLevel * 0.1; p.life -= 0.015; p.size += 0.1;
+        }
+        for (i = 0; i < s.splashes.length; i++) {
+            var sp = s.splashes[i];
+            sp.x += sp.vx; sp.y += sp.vy; sp.vy += sp.gravity; sp.vx += s.windLevel * 0.08;
+            sp.life -= 0.018; sp.r *= 0.997;
+        }
+        for (i = 0; i < s.escapeBubbles.length; i++) {
+            var eb = s.escapeBubbles[i];
+            eb.x += eb.vx; eb.y += eb.vy; eb.vy *= 0.98; eb.vy -= 0.02;
+            eb.vx += s.windLevel * 0.12; eb.r *= 1.005; eb.life -= 0.012;
+        }
+        for (i = 0; i < s.windParticles.length; i++) { s.windParticles[i].x += s.windParticles[i].speed; s.windParticles[i].life -= 0.01; }
+
+        s.flameParticles = s.flameParticles.filter(function(fp) { return fp.life > 0 && fp.size > 0.5; });
+        s.embers = s.embers.filter(function(em) { return em.life > 0; });
+        s.steam = s.steam.filter(function(p) { return p.life > 0; });
+        s.splashes = s.splashes.filter(function(sp) { return sp.life > 0 && sp.y < 400; });
+        s.escapeBubbles = s.escapeBubbles.filter(function(eb) { return eb.life > 0 && eb.y > -50; });
+        s.windParticles = s.windParticles.filter(function(w) { return w.x < 400 && w.life > 0; });
+
+        if (s.time % 5 === 0) {
+            s.history.push({ temp: s.currentTemp, setpoint: targetTemp });
+            if (s.history.length > MAX_HISTORY) s.history.shift();
+        }
+        s.time++;
+    }
+
+    // ======= DRAWING =======
+    function draw() {
+        var s = sim;
+        var W = simCanvas.width, H = simCanvas.height;
+        var i;
+        ctx.clearRect(0, 0, W, H);
+
+        var pw = s.burnerPower / 100;
+        var tRatio2 = Math.min(1, Math.max(0, (s.currentTemp - 20) / 80));
+
+        // Water colour
+        var cr = Math.floor(60 + 170 * tRatio2);
+        var cg = Math.floor(150 - 90 * tRatio2);
+        var cb = Math.floor(255 - 215 * tRatio2);
+
+        // Sun glow
+        if (s.sunLevel > 0) {
+            var sr = 20 + s.sunLevel * 10;
+            var grd = ctx.createRadialGradient(40, 40, 5, 40, 40, sr * 2);
+            grd.addColorStop(0, 'rgba(255,255,200,' + s.sunLevel + ')');
+            grd.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(40, 40, sr * 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,220,100,' + (s.sunLevel * 0.8) + ')';
+            ctx.beginPath(); ctx.arc(40, 40, sr * 0.5, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // === FLAME ===
+        if (s.burnerPower > 0) {
+            var fby = BURNER_Y;
+            var fh = pw * 80;
+            var tilt = s.windLevel * 25;
+
+            // Heat haze
+            if (pw > 0.15) {
+                ctx.save(); ctx.globalAlpha = pw * 0.12;
+                for (var hz = 0; hz < 5; hz++) {
+                    var hzy = fby - fh - 20 - hz * 8;
+                    var hzx = CENTER_X + tilt * 0.5 + Math.sin(s.time * 0.15 + hz * 2) * (4 + pw * 6);
+                    ctx.beginPath();
+                    ctx.ellipse(hzx, hzy, 8 + pw * 15, 2 + Math.abs(flameNoise(s.time * 0.05, hz * 3)), 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,200,100,0.3)'; ctx.fill();
+                }
+                ctx.restore();
+            }
+            // Ambient glow
+            ctx.save();
+            var glowGrad = ctx.createRadialGradient(CENTER_X, fby + 10, 5, CENTER_X, fby + 10, 30 + pw * 40);
+            glowGrad.addColorStop(0, 'rgba(255,150,50,' + (pw * 0.25) + ')');
+            glowGrad.addColorStop(1, 'rgba(255,100,0,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath(); ctx.arc(CENTER_X, fby + 10, 30 + pw * 40, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+
+            // Flame particles
+            var sortedFlame = s.flameParticles.slice().sort(function(a, b) { return a.life - b.life; });
+            for (i = 0; i < sortedFlame.length; i++) {
+                var fp = sortedFlame[i];
+                var h = Math.max(0, Math.min(1, fp.heat));
+                var fr, fg, fb;
+                if (h > 0.7) { fr = 255; fg = Math.floor(220 + h * 35); fb = Math.floor(150 + h * 100); }
+                else if (h > 0.35) { fr = 255; fg = Math.floor(120 + (h - 0.35) * 285); fb = Math.floor((h - 0.35) * 120); }
+                else { fr = Math.floor(180 + h * 214); fg = Math.floor(h * 120); fb = 0; }
+                var fa = fp.life * (0.5 + pw * 0.4);
+                ctx.save(); ctx.shadowBlur = fp.size * 2;
+                ctx.shadowColor = 'rgba(' + fr + ',' + Math.floor(fg * 0.7) + ',0,' + (fa * 0.5) + ')';
+                ctx.beginPath(); ctx.arc(fp.x, fp.y, fp.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + fr + ',' + fg + ',' + fb + ',' + fa + ')'; ctx.fill();
+                ctx.restore();
+            }
+            // Core flame cones
+            var fn1 = flameNoise(s.time * 0.08, 1.0);
+            ctx.save(); ctx.shadowBlur = 20 + pw * 15; ctx.shadowColor = 'rgba(255,120,0,' + (pw * 0.4) + ')';
+            ctx.beginPath(); ctx.moveTo(CENTER_X - 14 - pw * 4, fby);
+            ctx.quadraticCurveTo(CENTER_X + tilt, fby - fh * 0.9 - fn1 * 6, CENTER_X + 14 + pw * 4, fby);
+            ctx.fillStyle = 'rgba(255,80,0,' + (0.25 + pw * 0.15) + ')'; ctx.fill(); ctx.restore();
+            ctx.beginPath(); ctx.moveTo(CENTER_X - 10 - pw * 2, fby);
+            ctx.quadraticCurveTo(CENTER_X + tilt * 0.7, fby - fh * 0.7 - flameNoise(s.time * 0.08, 2.5) * 4, CENTER_X + 10 + pw * 2, fby);
+            ctx.fillStyle = 'rgba(255,160,0,' + (0.35 + pw * 0.25) + ')'; ctx.fill();
+            ctx.beginPath(); ctx.moveTo(CENTER_X - 7, fby);
+            ctx.quadraticCurveTo(CENTER_X + tilt * 0.4, fby - fh * 0.5 - flameNoise(s.time * 0.08, 4.0) * 3, CENTER_X + 7, fby);
+            ctx.fillStyle = 'rgba(255,220,80,' + (0.5 + pw * 0.3) + ')'; ctx.fill();
+            ctx.beginPath(); ctx.moveTo(CENTER_X - 5, fby);
+            ctx.quadraticCurveTo(CENTER_X + tilt * 0.15, fby - fh * 0.25, CENTER_X + 5, fby);
+            ctx.fillStyle = 'rgba(100,180,255,' + (0.5 + pw * 0.4) + ')'; ctx.fill();
+            ctx.beginPath(); ctx.arc(CENTER_X, fby - 3, 2 + pw * 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,240,' + (pw * 0.6) + ')'; ctx.fill();
+
+            // Embers
+            for (i = 0; i < s.embers.length; i++) {
+                var em = s.embers[i];
+                ctx.beginPath(); ctx.arc(em.x, em.y, em.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,' + Math.floor(180 + 75 * Math.sin(s.time * 0.3 + i * 4.1)) + ',50,' + (em.life * (0.6 + 0.4 * Math.sin(s.time * 0.5 + i * 7.3))) + ')';
+                ctx.fill();
+            }
+        }
+
+        // Steam
+        for (i = 0; i < s.steam.length; i++) {
+            var st = s.steam[i];
+            ctx.beginPath(); ctx.arc(st.x, st.y, st.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(220,230,240,' + (st.life * 0.4) + ')'; ctx.fill();
+        }
+
+        // === WATER — METABALL MESH RENDERING ===
+        // Clip to tube shape
+        ctx.save();
+        ctx.beginPath();
+        tubeOpenPath(ctx, TUBE_L, TUBE_TOP, TUBE_W, TUBE_H, 30);
+        ctx.closePath();
+        ctx.clip();
+
+        // Compute metaball field and render as filled mesh
+        computeField();
+
+        // Render the metaball field as a smooth filled region
+        // Use imageData for per-pixel rendering within the tube area
+        var imgData = ctx.getImageData(TUBE_L, TUBE_TOP, TUBE_W, TUBE_H);
+        var pixels = imgData.data;
+        var parts = s.waterParticles;
+
+        for (var py = 0; py < TUBE_H; py++) {
+            for (var px = 0; px < TUBE_W; px++) {
+                var worldX = TUBE_L + px;
+                var worldY = TUBE_TOP + py;
+                // Skip pixels outside tube (rounded bottom corners)
+                if (!insideTube(worldX, worldY)) continue;
+                var gx = Math.round(worldX / GRID_STEP);
+                var gy = Math.round(worldY / GRID_STEP);
+                var val = 0;
+                if (gx >= 0 && gx < fieldW && gy >= 0 && gy < fieldH) {
+                    // Bilinear interpolation from the grid
+                    var fx = worldX / GRID_STEP;
+                    var fy = worldY / GRID_STEP;
+                    var ix = Math.floor(fx);
+                    var iy = Math.floor(fy);
+                    var tx = fx - ix;
+                    var ty = fy - iy;
+                    if (ix >= 0 && ix < fieldW - 1 && iy >= 0 && iy < fieldH - 1) {
+                        var v00 = field[iy * fieldW + ix];
+                        var v10 = field[iy * fieldW + ix + 1];
+                        var v01 = field[(iy + 1) * fieldW + ix];
+                        var v11 = field[(iy + 1) * fieldW + ix + 1];
+                        val = v00 * (1 - tx) * (1 - ty) + v10 * tx * (1 - ty) + v01 * (1 - tx) * ty + v11 * tx * ty;
+                    }
+                }
+
+                if (val > METABALL_THRESHOLD * 0.5) {
+                    var idx4 = (py * TUBE_W + px) * 4;
+                    // Smooth alpha from threshold edge
+                    var alpha = Math.min(1, (val - METABALL_THRESHOLD * 0.5) / (METABALL_THRESHOLD * 0.8));
+                    // Depth shading: darker at bottom
+                    var depthFactor = py / TUBE_H;
+                    var dr = cr - depthFactor * 40;
+                    var dg = cg - depthFactor * 25;
+                    var db = cb - depthFactor * 40;
+                    // Surface highlight near the isosurface edge (subtle meniscus rim)
+                    var edgeNorm = (val - METABALL_THRESHOLD * 0.5) / (METABALL_THRESHOLD * 0.8);
+                    var edgeBright = (val < METABALL_THRESHOLD * 1.05) ? 15 * Math.max(0, 1 - edgeNorm) : 0;
+                    // Subtle caustic shimmer inside the body
+                    var caustic = 0;
+                    if (val > METABALL_THRESHOLD) {
+                        var cx1 = Math.sin(worldX * 0.3 + s.time * 0.04) * Math.cos(worldY * 0.25 + s.time * 0.03);
+                        var cx2 = Math.sin(worldX * 0.15 - s.time * 0.025 + 1.7) * Math.cos(worldY * 0.2 + s.time * 0.02);
+                        caustic = (cx1 + cx2) * 12 * (1 - depthFactor * 0.6);
+                    }
+                    pixels[idx4]     = Math.max(0, Math.min(255, dr + edgeBright + caustic * 0.4));
+                    pixels[idx4 + 1] = Math.max(0, Math.min(255, dg + edgeBright + caustic * 0.6));
+                    pixels[idx4 + 2] = Math.max(0, Math.min(255, db + edgeBright + caustic));
+                    pixels[idx4 + 3] = Math.floor(alpha * (190 + depthFactor * 55));
+                }
+            }
+        }
+        ctx.putImageData(imgData, TUBE_L, TUBE_TOP);
+
+        // Draw the marching-squares mesh outline on top for that "mesh" look
+        var segments = marchingSurface(METABALL_THRESHOLD);
+        if (segments.length > 0) {
+            ctx.beginPath();
+            for (i = 0; i < segments.length; i += 2) {
+                ctx.moveTo(segments[i].x, segments[i].y);
+                ctx.lineTo(segments[i + 1].x, segments[i + 1].y);
+            }
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+        }
+
+        // Bubble particles (inside water)
+        for (i = 0; i < s.bubbleParticles.length; i++) {
+            var bb = s.bubbleParticles[i];
+            ctx.beginPath(); ctx.arc(bb.x, bb.y, bb.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5; ctx.stroke();
+            ctx.beginPath(); ctx.arc(bb.x - bb.r * 0.3, bb.y - bb.r * 0.3, bb.r * 0.2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
+        }
+
+        ctx.restore(); // end tube clip
+
+        // Render escaped water particles as droplets above the tube
+        for (i = 0; i < s.waterParticles.length; i++) {
+            var ep = s.waterParticles[i];
+            if (!ep.escaped) continue;
+            var epAlpha = Math.min(1, Math.max(0.3, 1 - (TUBE_TOP - ep.y) / 80));
+            ctx.beginPath(); ctx.arc(ep.x, ep.y, PARTICLE_R * 1.2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + (epAlpha * 0.8) + ')';
+            ctx.fill();
+            // Specular highlight on droplet
+            ctx.beginPath(); ctx.arc(ep.x - PARTICLE_R * 0.3, ep.y - PARTICLE_R * 0.3, PARTICLE_R * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (epAlpha * 0.6) + ')'; ctx.fill();
+        }
+
+        // Splashes above tube
+        for (i = 0; i < s.splashes.length; i++) {
+            var sp = s.splashes[i];
+            var spAlpha = sp.life * 0.8;
+            ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + spAlpha + ')'; ctx.fill();
+            ctx.beginPath(); ctx.arc(sp.x - sp.r * 0.25, sp.y - sp.r * 0.25, sp.r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (spAlpha * 0.7) + ')'; ctx.fill();
+        }
+        // Escape bubbles
+        for (i = 0; i < s.escapeBubbles.length; i++) {
+            var eb = s.escapeBubbles[i];
+            ctx.beginPath(); ctx.arc(eb.x, eb.y, eb.r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(200,220,255,' + (eb.life * 0.6) + ')'; ctx.lineWidth = 0.8; ctx.stroke();
+            ctx.fillStyle = 'rgba(200,230,255,' + (eb.life * 0.1) + ')'; ctx.fill();
+        }
+
+        // Glass tube
+        ctx.beginPath();
+        tubeOpenPath(ctx, TUBE_L, TUBE_TOP, TUBE_W, TUBE_H, 30);
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.stroke();
+        // Tube lip
+        ctx.beginPath();
+        ctx.moveTo(TUBE_L - 3, TUBE_TOP); ctx.lineTo(TUBE_L, TUBE_TOP + 4);
+        ctx.moveTo(TUBE_R + 3, TUBE_TOP); ctx.lineTo(TUBE_R, TUBE_TOP + 4);
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+        // Glass highlights
+        ctx.beginPath(); ctx.moveTo(TUBE_L + 8, TUBE_TOP - 2); ctx.lineTo(TUBE_L + 8, TUBE_TOP + TUBE_H - 20);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(TUBE_R - 8, TUBE_TOP - 2); ctx.lineTo(TUBE_R - 8, TUBE_TOP + TUBE_H - 40);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 3; ctx.stroke();
+
+        // Burner base
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(CENTER_X - 12, BURNER_Y, 24, 35);
+        ctx.beginPath();
+        ctx.moveTo(CENTER_X - 35, BURNER_Y + 35); ctx.lineTo(CENTER_X + 35, BURNER_Y + 35);
+        ctx.lineTo(CENTER_X + 15, BURNER_Y + 10); ctx.lineTo(CENTER_X - 15, BURNER_Y + 10);
+        ctx.fill();
+
+        // Wind particles
+        ctx.strokeStyle = 'rgba(200,230,255,0.4)'; ctx.lineWidth = 2;
+        for (i = 0; i < s.windParticles.length; i++) {
+            var w = s.windParticles[i]; ctx.beginPath();
+            ctx.moveTo(w.x, w.y); ctx.quadraticCurveTo(w.x + w.len / 2, w.y - 5, w.x + w.len, w.y); ctx.stroke();
+        }
+
+        // HUD
+        s.displayTemp += (s.currentTemp - s.displayTemp) * 0.08;
+        s.displayPower += (s.burnerPower - s.displayPower) * 0.08;
+        ctx.font = 'bold 24px monospace'; ctx.textAlign = 'right';
+        ctx.fillStyle = s.displayTemp > 80 ? '#ef4444' : '#3b82f6';
+        ctx.fillText(s.displayTemp.toFixed(1) + '\u00B0C', W - 20, 40);
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText('TEMPERATURE', W - 20, 55);
+        ctx.font = 'bold 20px monospace'; ctx.fillStyle = '#f97316';
+        ctx.fillText(Math.round(s.displayPower) + '%', W - 20, 85);
+        ctx.font = '12px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText('BURNER POWER', W - 20, 100);
+
+        // Auto-tune indicator
+        if (autoTune.active) {
+            ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 11px sans-serif';
+            ctx.fillStyle = 'rgba(245,158,11,' + (0.7 + 0.3 * Math.sin(s.time * 0.15)) + ')';
+            ctx.fillText('\u25CF AUTO-TUNING', W / 2, 18);
+            ctx.font = '9px sans-serif'; ctx.fillStyle = 'rgba(180,130,40,0.8)';
+            ctx.fillText(autoTune.message, W / 2, 30); ctx.restore();
+        }
+
+        // Engine label
+        ctx.save(); ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
+        ctx.fillStyle = 'rgba(99,102,241,0.5)';
+        ctx.fillText('PARTICLE ENGINE \u00B7 ' + s.waterParticles.length + ' particles', W / 2, H - 6);
+        ctx.restore();
+
+        // Environment bars
+        var ey = 280;
+        ctx.textAlign = 'right'; ctx.fillStyle = '#94a3b8'; ctx.font = '10px sans-serif';
+        ctx.fillText('WIND', W - 20, ey);
+        ctx.fillStyle = '#cbd5e1'; ctx.fillRect(W - 80, ey + 5, 60, 4);
+        ctx.fillStyle = '#3b82f6'; ctx.fillRect(W - 80, ey + 5, 60 * s.windLevel, 4);
+        ctx.fillStyle = '#94a3b8'; ctx.fillText('SUN', W - 20, ey + 25);
+        ctx.fillStyle = '#cbd5e1'; ctx.fillRect(W - 80, ey + 30, 60, 4);
+        ctx.fillStyle = '#fbbf24'; ctx.fillRect(W - 80, ey + 30, 60 * s.sunLevel, 4);
+
+        // Graph
+        var gW = graphCanvas.width, gH = graphCanvas.height;
+        gCtx.clearRect(0, 0, gW, gH);
+        if (s.history.length > 0) {
+            var bw = gW / MAX_HISTORY;
+            for (i = 0; i < s.history.length; i++) {
+                var pt = s.history[i]; var gpx = i * bw;
+                gCtx.fillStyle = 'rgba(187,247,208,0.5)'; gCtx.fillRect(gpx, gH - (pt.setpoint / 120) * gH, bw, (pt.setpoint / 120) * gH);
+                var th = Math.min(gH, (pt.temp / 120) * gH);
+                gCtx.fillStyle = pt.temp > pt.setpoint ? '#f87171' : '#60a5fa'; gCtx.fillRect(gpx, gH - th, bw, th);
+            }
+        }
+        gCtx.strokeStyle = '#e2e8f0'; gCtx.lineWidth = 1;
+        gCtx.beginPath(); gCtx.moveTo(0, gH / 2); gCtx.lineTo(gW, gH / 2); gCtx.stroke();
+    }
+
+    // ======= MAIN LOOP =======
+    function loop() {
+        computeDynamicSurface();
+        updatePhysics();
+        updateParticles();
+        draw();
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
