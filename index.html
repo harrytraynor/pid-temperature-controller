@@ -4,626 +4,1099 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PID Lab Simulator</title>
-    
-    <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 min-h-screen flex items-center justify-center">
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
 
-<div id="root"></div>
+<div class="flex flex-col items-center w-full max-w-4xl mx-auto p-4 bg-slate-50 rounded-xl shadow-lg font-sans text-slate-700">
+  
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-6 w-full border-b pb-4 border-slate-200">
+    <div class="p-2 bg-blue-100 rounded-lg">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-blue-600">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">PID Temperature Controller</h1>
+      <p class="text-sm text-slate-500">Tune the loop to stabilize the liquid temperature.</p>
+    </div>
+  </div>
 
-<script type="text/babel">
-    const { useState, useEffect, useRef, useCallback } = React;
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+    
+    <!-- Left Column: Visuals -->
+    <div class="flex flex-col items-center justify-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <canvas id="simCanvas" width="300" height="350" style="width:100%;max-width:300px;background:#fff;"></canvas>
+      <div class="flex gap-4 mt-4">
+        <button id="btnPlayPause" class="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">
+          <svg id="iconPause" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <svg id="iconPlay" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="btnPlayLabel">Pause</span>
+        </button>
+        <button id="btnReset" class="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset
+        </button>
+      </div>
+    </div>
 
-    // --- Icons (Inline SVGs to replace lucide-react for standalone usage) ---
-    const IconBase = ({ children, className, ...props }) => (
-        <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="24" height="24" viewBox="0 0 24 24" 
-            fill="none" stroke="currentColor" strokeWidth="2" 
-            strokeLinecap="round" strokeLinejoin="round"
-            className={className} 
-            {...props}
-        >
-            {children}
-        </svg>
-    );
-
-    const Play = (props) => (
-        <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3" /></IconBase>
-    );
-    const RotateCcw = (props) => (
-        <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></IconBase>
-    );
-    const Thermometer = (props) => (
-        <IconBase {...props}><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" /></IconBase>
-    );
-    const Flame = (props) => (
-        <IconBase {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></IconBase>
-    );
-    const Settings = (props) => (
-        <IconBase {...props}>
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-            <circle cx="12" cy="12" r="3" />
-        </IconBase>
-    );
-    const Wind = (props) => (
-        <IconBase {...props}><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" /><path d="M9.6 4.6A2 2 0 1 1 11 8H2" /><path d="M12.6 19.4A2 2 0 1 0 14 16H2" /></IconBase>
-    );
-    const Sun = (props) => (
-        <IconBase {...props}><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="M4.93 4.93l1.41 1.41" /><path d="M17.66 17.66l1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="M6.34 17.66l-1.41 1.41" /><path d="M19.07 4.93l-1.41 1.41" /></IconBase>
-    );
-
-    // --- Main Application ---
-    const PIDLab = () => {
-      // --- State & Refs ---
-      const [isPlaying, setIsPlaying] = useState(true);
-      const [targetTemp, setTargetTemp] = useState(60);
+    <!-- Right Column: Controls & Graph -->
+    <div class="flex flex-col gap-6">
       
-      // PID Constants
-      const [kp, setKp] = useState(2.0);
-      const [ki, setKi] = useState(0.05);
-      const [kd, setKd] = useState(50.0);
+      <!-- Setpoint Slider -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+        <div class="flex justify-between items-center mb-4">
+          <label class="font-semibold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+            Target Temperature (Setpoint)
+          </label>
+          <span id="targetLabel" class="bg-green-100 text-green-800 px-2 py-1 rounded font-mono font-bold">60°C</span>
+        </div>
+        <input id="targetSlider" type="range" min="20" max="110" value="60" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"/>
+        <div class="flex justify-between text-xs text-slate-400 mt-2">
+          <span>20°C (Room)</span><span>100°C (Boil)</span><span>110°C</span>
+        </div>
+      </div>
 
-      // Simulation State
-      const simState = useRef({
-        currentTemp: 20, // Starting at room temp
+      <!-- PID Sliders -->
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+        <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          PID Constants
+        </h3>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Proportional (Kp)</span>
+            <span id="kpLabel" class="font-mono text-slate-500">2.0</span>
+          </div>
+          <input id="kpSlider" type="range" min="0" max="10" step="0.1" value="2.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"/>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Integral (Ki)</span>
+            <span id="kiLabel" class="font-mono text-slate-500">0.05</span>
+          </div>
+          <input id="kiSlider" type="range" min="0" max="0.5" step="0.01" value="0.05" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"/>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="font-medium text-slate-600">Derivative (Kd)</span>
+            <span id="kdLabel" class="font-mono text-slate-500">50.0</span>
+          </div>
+          <input id="kdSlider" type="range" min="0" max="100" step="1" value="50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600"/>
+        </div>
+      </div>
+
+      <!-- Graph -->
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 h-40 relative overflow-hidden">
+        <div class="absolute top-2 left-2 text-xs font-bold text-slate-400 z-10">Temperature History</div>
+        <canvas id="graphCanvas" width="400" height="140" style="width:100%;height:100%;"></canvas>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+    var simCanvas = document.getElementById('simCanvas');
+    var graphCanvas = document.getElementById('graphCanvas');
+    var ctx = simCanvas.getContext('2d');
+    var gCtx = graphCanvas.getContext('2d');
+
+    var btnPlayPause = document.getElementById('btnPlayPause');
+    var btnReset = document.getElementById('btnReset');
+    var iconPause = document.getElementById('iconPause');
+    var iconPlay = document.getElementById('iconPlay');
+    var btnPlayLabel = document.getElementById('btnPlayLabel');
+
+    var targetSlider = document.getElementById('targetSlider');
+    var targetLabel = document.getElementById('targetLabel');
+    var kpSlider = document.getElementById('kpSlider');
+    var kpLabel = document.getElementById('kpLabel');
+    var kiSlider = document.getElementById('kiSlider');
+    var kiLabel = document.getElementById('kiLabel');
+    var kdSlider = document.getElementById('kdSlider');
+    var kdLabel = document.getElementById('kdLabel');
+
+    var isPlaying = true;
+    var targetTemp = 60;
+    var kp = 2.0, ki = 0.05, kd = 50.0;
+
+    var sim = {
+        currentTemp: 20,
         integral: 0,
         lastError: 0,
-        burnerPower: 0, // 0 to 100
+        burnerPower: 0,
         bubbles: [],
+        pops: [],
+        surfaceRipples: [],
+        convection: [],
+        splashes: [],
+        escapeBubbles: [],
+        flameParticles: [],
+        embers: [],
         steam: [],
-        windParticles: [], // Lines representing wind
-        windLevel: 0,      // 0.0 to 1.0
-        sunLevel: 0.5,     // 0.0 to 1.0
-        history: [], 
+        windParticles: [],
+        windLevel: 0,
+        sunLevel: 0.5,
+        history: [],
         time: 0,
-        wavePhase: 0 // For liquid sloshing
-      });
+        wavePhase: 0,
+        causticPhase: 0,
+        displayTemp: 20,
+        displayPower: 0
+    };
 
-      const canvasRef = useRef(null);
-      const requestRef = useRef();
+    var DT = 0.1;
+    var MAX_HISTORY = 200;
+    var AMBIENT_TEMP = 20;
 
-      // --- Constants ---
-      const DT = 0.1; // Time step
-      const MAX_HISTORY = 200;
-      const AMBIENT_TEMP = 20;
+    // Tube geometry constants (shared between physics & drawing)
+    var CANVAS_W = 300;
+    var CENTER_X = CANVAS_W / 2;
+    var TUBE_W = 60;
+    var TUBE_H = 160;
+    var TUBE_TOP = 60;
+    var BURNER_Y = TUBE_TOP + TUBE_H + 25;
 
-      // --- Physics & PID Logic ---
-      const updatePhysics = useCallback(() => {
-        const state = simState.current;
-        
-        // 1. PID Calculation
-        const error = targetTemp - state.currentTemp;
-        
+    // --- UI Bindings ---
+    targetSlider.addEventListener('input', function() {
+        targetTemp = Number(this.value);
+        targetLabel.textContent = targetTemp + '\u00B0C';
+    });
+    kpSlider.addEventListener('input', function() {
+        kp = Number(this.value);
+        kpLabel.textContent = kp.toFixed(1);
+    });
+    kiSlider.addEventListener('input', function() {
+        ki = Number(this.value);
+        kiLabel.textContent = ki.toFixed(2);
+    });
+    kdSlider.addEventListener('input', function() {
+        kd = Number(this.value);
+        kdLabel.textContent = kd.toFixed(1);
+    });
+    btnPlayPause.addEventListener('click', function() {
+        isPlaying = !isPlaying;
+        iconPause.style.display = isPlaying ? '' : 'none';
+        iconPlay.style.display = isPlaying ? 'none' : '';
+        btnPlayLabel.textContent = isPlaying ? 'Pause' : 'Resume';
+    });
+    btnReset.addEventListener('click', function() {
+        sim.currentTemp = 20;
+        sim.integral = 0;
+        sim.lastError = 0;
+        sim.history = [];
+        sim.bubbles = [];
+        sim.pops = [];
+        sim.surfaceRipples = [];
+        sim.convection = [];
+        sim.splashes = [];
+        sim.escapeBubbles = [];
+        sim.flameParticles = [];
+        sim.embers = [];
+        sim.steam = [];
+        sim.windParticles = [];
+        sim.burnerPower = 0;
+        sim.time = 0;
+        sim.causticPhase = 0;
+        sim.displayTemp = 20;
+        sim.displayPower = 0;
+    });
+
+    // Portable rounded rectangle path
+    function rrect(c, x, y, w, h, radii) {
+        var tl = radii[0] || 0, tr = radii[1] || 0, br = radii[2] || 0, bl = radii[3] || 0;
+        c.moveTo(x + tl, y);
+        c.lineTo(x + w - tr, y);
+        c.arcTo(x + w, y, x + w, y + tr, tr);
+        c.lineTo(x + w, y + h - br);
+        c.arcTo(x + w, y + h, x + w - br, y + h, br);
+        c.lineTo(x + bl, y + h);
+        c.arcTo(x, y + h, x, y + h - bl, bl);
+        c.lineTo(x, y + tl);
+        c.arcTo(x, y, x + tl, y, tl);
+        c.closePath();
+    }
+
+    // Open-top tube path (U-shape: left wall, rounded bottom, right wall — NO top line)
+    function tubeOpenPath(c, x, y, w, h, br) {
+        var r = br || 30;
+        c.moveTo(x, y);                       // top-left opening
+        c.lineTo(x, y + h - r);               // left wall down
+        c.arcTo(x, y + h, x + r, y + h, r);   // bottom-left curve
+        c.lineTo(x + w - r, y + h);            // bottom flat
+        c.arcTo(x + w, y + h, x + w, y + h - r, r); // bottom-right curve
+        c.lineTo(x + w, y);                    // right wall up
+        // Do NOT close — leave the top open
+    }
+
+    // Smooth pseudo-noise for flame (deterministic, no flicker)
+    function flameNoise(t, seed) {
+        return Math.sin(t * 0.37 + seed) * 0.5
+             + Math.sin(t * 0.71 + seed * 2.3) * 0.3
+             + Math.sin(t * 1.13 + seed * 0.7) * 0.2;
+    }
+
+    // --- Physics ---
+    function updatePhysics() {
+        var s = sim;
+        var error = targetTemp - s.currentTemp;
+
         if (isPlaying) {
-          state.integral += error * DT;
-          // Anti-windup
-          state.integral = Math.max(-500, Math.min(500, state.integral));
+            s.integral += error * DT;
+            s.integral = Math.max(-500, Math.min(500, s.integral));
         }
 
-        const derivative = (error - state.lastError) / DT;
-        state.lastError = error;
+        var derivative = (error - s.lastError) / DT;
+        s.lastError = error;
 
-        let output = (kp * error) + (ki * state.integral) + (kd * derivative);
-        state.burnerPower = Math.max(0, Math.min(100, output));
+        var output = (kp * error) + (ki * s.integral) + (kd * derivative);
+        var targetPower = Math.max(0, Math.min(100, output));
 
-        // 2. Environmental Factors (Random Walk)
-        if (isPlaying) {
-            // Wind fluctuates faster
-            state.windLevel += (Math.random() - 0.5) * 0.05;
-            state.windLevel = Math.max(0, Math.min(1, state.windLevel));
-            
-            // Sun fluctuates slower
-            state.sunLevel += (Math.random() - 0.5) * 0.01;
-            state.sunLevel = Math.max(0, Math.min(1, state.sunLevel));
-        }
-
-        // 3. Thermal Physics
-        // Burner Heat
-        const heatGain = (state.burnerPower / 100) * 0.9; 
-        
-        // Sun Heat (Adds small constant heat)
-        const sunHeat = state.sunLevel * 0.15; 
-
-        // Standard Loss (Newton's Law)
-        let heatLossFactor = 0.02;
-        // Wind Effect (Increases heat loss coefficient significantly)
-        heatLossFactor += state.windLevel * 0.03; 
-
-        const heatLoss = (state.currentTemp - AMBIENT_TEMP) * heatLossFactor;
+        // Slew-rate limit: burner can only ramp up/down at a realistic rate
+        var maxRamp = 1.5; // max % change per physics tick
+        var diff = targetPower - s.burnerPower;
+        if (diff > maxRamp) diff = maxRamp;
+        if (diff < -maxRamp) diff = -maxRamp;
+        s.burnerPower += diff;
 
         if (isPlaying) {
-          state.currentTemp += (heatGain + sunHeat - heatLoss) * DT;
-          state.wavePhase += 0.1; // Move the liquid wave
-
-          // Boiling limit
-          if (state.currentTemp > 100) {
-            state.currentTemp -= (state.currentTemp - 100) * 0.6; // Energy loss to phase change
-            state.wavePhase += 0.2;
-          }
+            s.windLevel += (Math.random() - 0.5) * 0.05;
+            s.windLevel = Math.max(0, Math.min(1, s.windLevel));
+            s.sunLevel += (Math.random() - 0.5) * 0.01;
+            s.sunLevel = Math.max(0, Math.min(1, s.sunLevel));
         }
 
-        // 4. Particle Systems
-        // Spawn Wind Particles
-        if (isPlaying && Math.random() < state.windLevel * 0.3) {
-            state.windParticles.push({
-                x: -20,
-                y: 50 + Math.random() * 200,
-                length: 20 + Math.random() * 40,
-                speed: 5 + state.windLevel * 10,
-                life: 1.0
-            });
+        var heatGain = (s.burnerPower / 100) * 2.5;
+        var sunHeat = s.sunLevel * 0.15;
+        var heatLossFactor = 0.02 + s.windLevel * 0.03;
+        var heatLoss = (s.currentTemp - AMBIENT_TEMP) * heatLossFactor;
+        // Evaporative cooling kicks in hard above 100
+        if (s.currentTemp > 100) heatLoss += (s.currentTemp - 100) * 0.3;
+
+        if (isPlaying) {
+            s.currentTemp += (heatGain + sunHeat - heatLoss) * DT;
+            s.wavePhase += 0.1;
+            // Hard cap at 110 (can't exceed slider max)
+            if (s.currentTemp > 110) {
+                s.currentTemp = 110;
+            }
+            if (s.currentTemp > 95) {
+                s.wavePhase += 0.15 + (s.currentTemp - 95) * 0.02;
+            }
         }
 
-        // Spawn Bubbles
-        if (state.currentTemp > 90 && isPlaying) {
-          const boilIntensity = Math.max(0, state.currentTemp - 90);
-          if (Math.random() < boilIntensity * 0.08) {
-            state.bubbles.push({
-              x: 35 + Math.random() * 30,
-              y: 180,
-              r: 2 + Math.random() * 4,
-              speed: 1 + Math.random() * 3,
-              wobbleOffset: Math.random() * Math.PI * 2
-            });
-          }
+        var tRatio = Math.min(1, Math.max(0, (s.currentTemp - 20) / 80));
+        if (isPlaying) {
+            s.causticPhase += 0.04 + tRatio * 0.06;
         }
-        
-        // Spawn Steam
-        if (state.currentTemp > 80 && isPlaying) {
-            const steamIntensity = Math.max(0, state.currentTemp - 80);
-            // Wind blows steam away!
-            const windBias = state.windLevel * 2; 
 
-            if (Math.random() < steamIntensity * 0.08) {
-                state.steam.push({
-                    x: 35 + Math.random() * 30,
-                    y: 40,
-                    vx: (Math.random() - 0.5) * 0.8 + windBias, 
-                    vy: -1.5 - Math.random(),
-                    life: 1.0,
-                    size: 3 + Math.random() * 5
+        // Wind particles
+        if (isPlaying && Math.random() < s.windLevel * 0.3) {
+            s.windParticles.push({ x: -20, y: 50 + Math.random() * 200, len: 20 + Math.random() * 40, speed: 5 + s.windLevel * 10, life: 1.0 });
+        }
+
+        // Bubbles — spawn from heated bottom, rate and size scale with temperature
+        if (isPlaying && s.currentTemp > 50) {
+            var bubbleIntensity = Math.max(0, (s.currentTemp - 50) / 50);
+            var bubbleChance = bubbleIntensity * 0.12;
+            if (s.currentTemp > 95) bubbleChance += 0.25; // vigorous boil
+            if (Math.random() < bubbleChance) {
+                var bSize = 1.5 + Math.random() * 3 + bubbleIntensity * 2;
+                s.bubbles.push({
+                    x: 8 + Math.random() * 44, // spread across tube width
+                    y: 155 + Math.random() * 5, // start near bottom
+                    r: bSize,
+                    speed: 0.4 + Math.random() * 1.5 + bubbleIntensity * 1.5,
+                    wobble: Math.random() * Math.PI * 2,
+                    wobbleSpeed: 0.02 + Math.random() * 0.04,
+                    wobbleAmp: 0.3 + Math.random() * 0.8,
+                    opacity: 0.3 + Math.random() * 0.3
                 });
             }
         }
 
-        // Update Particles
-        state.bubbles.forEach(b => {
-            b.y -= b.speed;
-            b.x += Math.sin(state.time * 0.1 + b.wobbleOffset) * 0.5;
-        });
-        
-        state.steam.forEach(s => {
-            s.x += s.vx;
-            s.y += s.vy;
-            s.vx += state.windLevel * 0.1; // Wind accelerates existing steam
-            s.life -= 0.015;
-            s.size += 0.1;
-        });
-
-        state.windParticles.forEach(w => {
-            w.x += w.speed;
-            w.life -= 0.01;
-        });
-
-        // Cleanup
-        state.bubbles = state.bubbles.filter(b => b.y > 40);
-        state.steam = state.steam.filter(s => s.life > 0);
-        state.windParticles = state.windParticles.filter(w => w.x < 400 && w.life > 0);
-
-        // 5. History
-        if (state.time % 5 === 0) {
-          state.history.push({ temp: state.currentTemp, setpoint: targetTemp });
-          if (state.history.length > MAX_HISTORY) state.history.shift();
+        // Convection current particles — visible internal flow
+        if (isPlaying && s.currentTemp > 30) {
+            var convIntensity = (s.currentTemp - 30) / 70;
+            if (Math.random() < convIntensity * 0.15 && s.convection.length < 40) {
+                var side = Math.random() > 0.5 ? 1 : -1;
+                s.convection.push({
+                    x: 30 + side * (5 + Math.random() * 15),
+                    y: 150,
+                    vx: -side * (0.1 + convIntensity * 0.3),
+                    vy: -(0.3 + convIntensity * 1.2),
+                    life: 1.0,
+                    size: 1 + Math.random() * 1.5
+                });
+            }
         }
-        state.time++;
 
-      }, [targetTemp, kp, ki, kd, isPlaying]);
+        // Flame particles — spawn from burner nozzle
+        if (isPlaying && s.burnerPower > 0) {
+            var fpw = s.burnerPower / 100;
+            var numFlame = Math.floor(1 + fpw * 3 + Math.random() * 2 * fpw);
+            for (var fi = 0; fi < numFlame; fi++) {
+                var angle = -Math.PI / 2 + (Math.random() - 0.5) * (0.6 + s.windLevel * 0.8);
+                var spd = 1.5 + Math.random() * 3 * fpw;
+                s.flameParticles.push({
+                    x: CENTER_X + (Math.random() - 0.5) * 16,
+                    y: BURNER_Y,
+                    vx: Math.cos(angle) * spd + s.windLevel * 1.5,
+                    vy: Math.sin(angle) * spd,
+                    life: 0.6 + Math.random() * 0.4,
+                    size: 3 + Math.random() * 5 * fpw,
+                    heat: 0.5 + Math.random() * 0.5
+                });
+            }
+            // Embers / sparks at higher power
+            if (fpw > 0.3 && Math.random() < fpw * 0.3) {
+                s.embers.push({
+                    x: CENTER_X + (Math.random() - 0.5) * 12,
+                    y: BURNER_Y - 5,
+                    vx: (Math.random() - 0.5) * 3 + s.windLevel * 2,
+                    vy: -(2 + Math.random() * 4 * fpw),
+                    life: 1.0,
+                    size: 0.8 + Math.random() * 1.5
+                });
+            }
+        }
 
-      // --- Rendering ---
-      const draw = useCallback(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const state = simState.current;
+        // Steam — rises from the water surface, not the beaker rim
+        if (s.currentTemp > 80 && isPlaying) {
+            var si = Math.max(0, s.currentTemp - 80);
+            var wb = s.windLevel * 2;
+            if (Math.random() < si * 0.08) {
+                s.steam.push({ x: 10 + Math.random() * 40, y: 38 + (Math.random() - 0.5) * 4, vx: (Math.random() - 0.5) * 0.8 + wb, vy: -1.0 - Math.random() * 0.8, life: 1.0, size: 2 + Math.random() * 4 });
+            }
+        }
 
-        // Clear
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Spontaneous boil-over sputtering — violent splashes independent of bubble pops
+        if (isPlaying && s.currentTemp > 92) {
+            var spitForce = (s.currentTemp - 92) / 8; // 0..1+
+            if (Math.random() < spitForce * 0.08) {
+                var spitX = 10 + Math.random() * 40;
+                var numSpits = 2 + Math.floor(Math.random() * 4 * spitForce);
+                for (var si2 = 0; si2 < numSpits; si2++) {
+                    s.splashes.push({
+                        x: spitX + (Math.random() - 0.5) * 8,
+                        y: 36 + Math.random() * 4,
+                        vx: (Math.random() - 0.5) * (3 + spitForce * 4),
+                        vy: -(3 + Math.random() * 5 * spitForce),
+                        r: 0.8 + Math.random() * 2,
+                        life: 1.0,
+                        gravity: 0.12 + Math.random() * 0.04
+                    });
+                }
+            }
+        }
 
-        const centerX = canvas.width / 2;
-        const tubeWidth = 60;
-        const tubeHeight = 160;
-        const tubeTop = 60;
-        
-        // --- 0. Environmental Background ---
-        
-        // Sun
-        if (state.sunLevel > 0) {
-            const sunX = 40;
-            const sunY = 40;
-            const sunRadius = 20 + state.sunLevel * 10;
-            
-            const grd = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, sunRadius * 2);
-            grd.addColorStop(0, `rgba(255, 255, 200, ${state.sunLevel})`);
-            grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            
+        var i;
+        // Bubble physics — wobble, rise, decelerate slightly, pop at surface
+        for (i = s.bubbles.length - 1; i >= 0; i--) {
+            var b = s.bubbles[i];
+            b.y -= b.speed;
+            b.wobble += b.wobbleSpeed;
+            b.x += Math.sin(b.wobble) * b.wobbleAmp;
+            b.r *= 1.001; // grow slightly as pressure decreases rising
+            if (b.y < 42) {
+                // Pop! Create a pop effect
+                s.pops.push({ x: b.x, y: b.y, r: b.r, life: 1.0 });
+                // Surface ripple — bubble pop disturbs the water surface
+                s.surfaceRipples.push({
+                    x: b.x,
+                    amp: Math.min(b.r * 0.8, 3.5),
+                    age: 0,
+                    spread: b.r * 0.8,
+                    freq: 0.3 + Math.random() * 0.15
+                });
+                // At high temps, popping bubbles can fling water droplets out
+                if (s.currentTemp > 88) {
+                    var splashForce = (s.currentTemp - 88) / 12; // 0..1
+                    // Bigger bubbles = more splash
+                    var numDrops = (Math.random() < splashForce * 0.5 + (b.r / 8) * 0.4) ? Math.floor(1 + Math.random() * 3 * splashForce) : 0;
+                    for (var di = 0; di < numDrops; di++) {
+                        s.splashes.push({
+                            x: b.x,
+                            y: 38,
+                            vx: (Math.random() - 0.5) * (2 + splashForce * 3),
+                            vy: -(2 + Math.random() * 4 * splashForce + b.r * 0.5),
+                            r: 1 + Math.random() * 2.5,
+                            life: 1.0,
+                            gravity: 0.12 + Math.random() * 0.04
+                        });
+                    }
+                    // Occasionally a whole bubble escapes the tube
+                    if (s.currentTemp > 95 && Math.random() < splashForce * 0.3) {
+                        s.escapeBubbles.push({
+                            x: b.x,
+                            y: 38,
+                            vx: (Math.random() - 0.5) * 1.5,
+                            vy: -(1.5 + Math.random() * 2.5 * splashForce),
+                            r: b.r * (0.5 + Math.random() * 0.5),
+                            life: 1.0
+                        });
+                    }
+                }
+                s.bubbles.splice(i, 1);
+            }
+        }
+        // Pop animations
+        for (i = 0; i < s.pops.length; i++) {
+            s.pops[i].life -= 0.08;
+            s.pops[i].r += 0.5;
+        }
+        // Surface ripple physics — expand outward, decay
+        for (i = s.surfaceRipples.length - 1; i >= 0; i--) {
+            var rp = s.surfaceRipples[i];
+            rp.age += 0.05;
+            rp.spread += 0.9;
+            rp.amp *= 0.965;
+            if (rp.amp < 0.08 || rp.age > 4) {
+                s.surfaceRipples.splice(i, 1);
+            }
+        }
+        // Convection particles — circulate: rise in center, fall at edges
+        for (i = 0; i < s.convection.length; i++) {
+            var cv = s.convection[i];
+            cv.x += cv.vx;
+            cv.y += cv.vy;
+            // At the top, push outward; at the bottom, push inward
+            if (cv.y < 60) { cv.vy *= 0.95; cv.vx = (cv.x > 30 ? 1 : -1) * 0.4; cv.vy += 0.1; }
+            if (cv.y > 140) { cv.vy *= 0.95; cv.vx = (cv.x > 30 ? -1 : 1) * 0.2; cv.vy -= 0.05; }
+            // Keep within tube bounds
+            if (cv.x < 5) cv.vx += 0.1;
+            if (cv.x > 55) cv.vx -= 0.1;
+            cv.life -= 0.005;
+        }
+        // Splash droplets — gravity, wind, fade
+        for (i = 0; i < s.splashes.length; i++) {
+            var sp = s.splashes[i];
+            sp.x += sp.vx;
+            sp.y += sp.vy;
+            sp.vy += sp.gravity; // gravity pulls back down
+            sp.vx += s.windLevel * 0.08; // wind pushes sideways
+            sp.life -= 0.018;
+            sp.r *= 0.997; // shrink slightly in the air
+        }
+        // Escape bubbles — float up and drift with wind, pop after a bit
+        for (i = 0; i < s.escapeBubbles.length; i++) {
+            var eb = s.escapeBubbles[i];
+            eb.x += eb.vx;
+            eb.y += eb.vy;
+            eb.vy *= 0.98; // decelerate upward
+            eb.vy -= 0.02; // slight buoyancy in air
+            eb.vx += s.windLevel * 0.12;
+            eb.r *= 1.005; // expand slightly in air
+            eb.life -= 0.012;
+        }
+        // Flame particles — rise, spread, fade
+        for (i = 0; i < s.flameParticles.length; i++) {
+            var fp = s.flameParticles[i];
+            fp.x += fp.vx;
+            fp.y += fp.vy;
+            fp.vy -= 0.05; // buoyancy
+            fp.vx += s.windLevel * 0.15;
+            fp.vx *= 0.98;
+            fp.life -= 0.025;
+            fp.size *= 0.98;
+            fp.heat -= 0.015; // cool as it rises
+        }
+        // Embers — fast, gravity, sparkle
+        for (i = 0; i < s.embers.length; i++) {
+            var em = s.embers[i];
+            em.x += em.vx;
+            em.y += em.vy;
+            em.vy += 0.06; // gravity
+            em.vx += s.windLevel * 0.1;
+            em.life -= 0.015;
+            em.size *= 0.995;
+        }
+        for (i = 0; i < s.steam.length; i++) { var p = s.steam[i]; p.x += p.vx; p.y += p.vy; p.vx += s.windLevel * 0.1; p.life -= 0.015; p.size += 0.1; }
+        for (i = 0; i < s.windParticles.length; i++) { s.windParticles[i].x += s.windParticles[i].speed; s.windParticles[i].life -= 0.01; }
+
+        s.bubbles = s.bubbles.filter(function(b) { return b.y > 20; });
+        s.pops = s.pops.filter(function(p) { return p.life > 0; });
+        s.convection = s.convection.filter(function(c) { return c.life > 0 && c.y > 30 && c.y < 165; });
+        s.splashes = s.splashes.filter(function(sp) { return sp.life > 0 && sp.y < 200; });
+        s.escapeBubbles = s.escapeBubbles.filter(function(eb) { return eb.life > 0 && eb.y > -50; });
+        s.flameParticles = s.flameParticles.filter(function(fp) { return fp.life > 0 && fp.size > 0.5; });
+        s.embers = s.embers.filter(function(em) { return em.life > 0; });
+        s.steam = s.steam.filter(function(p) { return p.life > 0; });
+        s.windParticles = s.windParticles.filter(function(w) { return w.x < 400 && w.life > 0; });
+
+        if (s.time % 5 === 0) {
+            s.history.push({ temp: s.currentTemp, setpoint: targetTemp });
+            if (s.history.length > MAX_HISTORY) s.history.shift();
+        }
+        s.time++;
+    }
+
+    // --- Drawing ---
+    function draw() {
+        var s = sim;
+        var W = simCanvas.width;
+        var H = simCanvas.height;
+        var i;
+
+        ctx.clearRect(0, 0, W, H);
+
+        var pw = s.burnerPower / 100;
+        var centerX = CENTER_X;
+        var tubeW = TUBE_W;
+        var tubeH = TUBE_H;
+        var tubeTop = TUBE_TOP;
+
+        // Sun glow
+        if (s.sunLevel > 0) {
+            var sr = 20 + s.sunLevel * 10;
+            var grd = ctx.createRadialGradient(40, 40, 5, 40, 40, sr * 2);
+            grd.addColorStop(0, 'rgba(255,255,200,' + s.sunLevel + ')');
+            grd.addColorStop(1, 'rgba(255,255,255,0)');
             ctx.fillStyle = grd;
             ctx.beginPath();
-            ctx.arc(sunX, sunY, sunRadius * 3, 0, Math.PI * 2);
+            ctx.arc(40, 40, sr * 3, 0, Math.PI * 2);
             ctx.fill();
-
-            // Sun Core
-            ctx.fillStyle = `rgba(255, 220, 100, ${state.sunLevel * 0.8})`;
+            ctx.fillStyle = 'rgba(255,220,100,' + (s.sunLevel * 0.8) + ')';
             ctx.beginPath();
-            ctx.arc(sunX, sunY, sunRadius * 0.5, 0, Math.PI * 2);
+            ctx.arc(40, 40, sr * 0.5, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // --- 1. Draw Burner Flame ---
-        if (state.burnerPower > 0) {
-          const powerRatio = state.burnerPower / 100;
-          const flameH = powerRatio * 70;
-          const flicker = Math.random() * 5;
-          const flameBaseY = tubeTop + tubeHeight + 25;
-          
-          // Wind deflects flame slightly
-          const flameTilt = state.windLevel * 20; 
+        // === FLAME RENDERING ===
+        if (s.burnerPower > 0) {
+            var fby = tubeTop + tubeH + 25;
+            var fh = pw * 80;
+            var tilt = s.windLevel * 25;
 
-          ctx.save();
-          ctx.globalCompositeOperation = 'screen';
-          
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = 'orange';
+            // Heat haze / shimmer above flame
+            if (pw > 0.15) {
+                ctx.save();
+                ctx.globalAlpha = pw * 0.12;
+                for (var hz = 0; hz < 5; hz++) {
+                    var hzy = fby - fh - 20 - hz * 8;
+                    var hzx = centerX + tilt * 0.5 + Math.sin(s.time * 0.15 + hz * 2) * (4 + pw * 6);
+                    var hzw = 8 + pw * 15 + Math.sin(s.time * 0.1 + hz) * 3;
+                    ctx.beginPath();
+                    ctx.ellipse(hzx, hzy, hzw, 2 + Math.abs(flameNoise(s.time * 0.05, hz * 3)), 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,200,100,0.3)';
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
 
-          // Outer Flame
-          ctx.beginPath();
-          ctx.moveTo(centerX - 12, flameBaseY);
-          ctx.quadraticCurveTo(centerX + flameTilt, flameBaseY - flameH - 10 - flicker, centerX + 12, flameBaseY);
-          ctx.fillStyle = `rgba(255, ${100 + Math.random() * 50}, 0, ${0.4 + powerRatio * 0.4})`;
-          ctx.fill();
+            // Ambient glow on ground
+            ctx.save();
+            var glowR = 30 + pw * 40;
+            var glowGrad = ctx.createRadialGradient(centerX, fby + 10, 5, centerX, fby + 10, glowR);
+            glowGrad.addColorStop(0, 'rgba(255,150,50,' + (pw * 0.25) + ')');
+            glowGrad.addColorStop(1, 'rgba(255,100,0,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(centerX, fby + 10, glowR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
 
-          // Inner Flame
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = 'yellow';
-          ctx.beginPath();
-          ctx.moveTo(centerX - 8, flameBaseY);
-          ctx.quadraticCurveTo(centerX + flameTilt * 0.8, flameBaseY - (flameH * 0.7) - flicker, centerX + 8, flameBaseY);
-          ctx.fillStyle = `rgba(255, 200, 0, ${0.5 + powerRatio * 0.5})`;
-          ctx.fill();
+            // --- Flame particle rendering (sorted back-to-front by life) ---
+            var sortedFlame = s.flameParticles.slice().sort(function(a, b) { return a.life - b.life; });
+            for (i = 0; i < sortedFlame.length; i++) {
+                var fp = sortedFlame[i];
+                var h = Math.max(0, Math.min(1, fp.heat));
+                var l = fp.life;
+                // Color: white-hot core → yellow → orange → red → dark red tip
+                var fr, fg, fb, fa;
+                if (h > 0.7) {
+                    // White-hot to bright yellow
+                    fr = 255;
+                    fg = Math.floor(220 + h * 35);
+                    fb = Math.floor(150 + h * 100);
+                } else if (h > 0.35) {
+                    // Yellow to orange
+                    fr = 255;
+                    fg = Math.floor(120 + (h - 0.35) * 285);
+                    fb = Math.floor((h - 0.35) * 120);
+                } else {
+                    // Orange to deep red
+                    fr = Math.floor(180 + h * 214);
+                    fg = Math.floor(h * 120);
+                    fb = 0;
+                }
+                fa = l * (0.5 + pw * 0.4);
 
-          // Core Flame
-          ctx.shadowBlur = 5;
-          ctx.shadowColor = 'blue';
-          ctx.beginPath();
-          ctx.moveTo(centerX - 5, flameBaseY);
-          ctx.quadraticCurveTo(centerX + flameTilt * 0.3, flameBaseY - (flameH * 0.3), centerX + 5, flameBaseY);
-          ctx.fillStyle = `rgba(100, 200, 255, 0.8)`;
-          ctx.fill();
+                // Soft glow behind particle
+                ctx.save();
+                ctx.shadowBlur = fp.size * 2;
+                ctx.shadowColor = 'rgba(' + fr + ',' + Math.floor(fg * 0.7) + ',0,' + (fa * 0.5) + ')';
+                ctx.beginPath();
+                ctx.arc(fp.x, fp.y, fp.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + fr + ',' + fg + ',' + fb + ',' + fa + ')';
+                ctx.fill();
+                ctx.restore();
+            }
 
-          ctx.restore();
+            // --- Core flame shape (layered cones for structure) ---
+            var fn1 = flameNoise(s.time * 0.08, 1.0);
+            var fn2 = flameNoise(s.time * 0.08, 2.5);
+            var fn3 = flameNoise(s.time * 0.08, 4.0);
+            var fn4 = flameNoise(s.time * 0.08, 5.5);
+
+            // Outer flame envelope
+            ctx.save();
+            ctx.shadowBlur = 20 + pw * 15;
+            ctx.shadowColor = 'rgba(255,120,0,' + (pw * 0.4) + ')';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 14 - pw * 4, fby);
+            ctx.quadraticCurveTo(
+                centerX + tilt + Math.sin(s.time * 0.3) * 3,
+                fby - fh * 0.9 - fn1 * 6,
+                centerX + 14 + pw * 4, fby
+            );
+            ctx.fillStyle = 'rgba(255,80,0,' + (0.25 + pw * 0.15) + ')';
+            ctx.fill();
+            ctx.restore();
+
+            // Mid flame
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(255,180,0,0.5)';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 10 - pw * 2, fby);
+            ctx.quadraticCurveTo(
+                centerX + tilt * 0.7 + Math.sin(s.time * 0.4 + 1) * 2,
+                fby - fh * 0.7 - fn2 * 4,
+                centerX + 10 + pw * 2, fby
+            );
+            ctx.fillStyle = 'rgba(255,160,0,' + (0.35 + pw * 0.25) + ')';
+            ctx.fill();
+            ctx.restore();
+
+            // Inner bright cone
+            ctx.beginPath();
+            ctx.moveTo(centerX - 7, fby);
+            ctx.quadraticCurveTo(
+                centerX + tilt * 0.4 + Math.sin(s.time * 0.5 + 2) * 1.5,
+                fby - fh * 0.5 - fn3 * 3,
+                centerX + 7, fby
+            );
+            ctx.fillStyle = 'rgba(255,220,80,' + (0.5 + pw * 0.3) + ')';
+            ctx.fill();
+
+            // Blue core (hottest part, at nozzle)
+            ctx.beginPath();
+            ctx.moveTo(centerX - 5, fby);
+            ctx.quadraticCurveTo(
+                centerX + tilt * 0.15,
+                fby - fh * 0.25 - fn4 * 1.5,
+                centerX + 5, fby
+            );
+            var blueAlpha = 0.5 + pw * 0.4;
+            ctx.fillStyle = 'rgba(100,180,255,' + blueAlpha + ')';
+            ctx.fill();
+            // White-hot center dot
+            ctx.beginPath();
+            ctx.arc(centerX + tilt * 0.05, fby - 3, 2 + pw * 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,240,' + (pw * 0.6) + ')';
+            ctx.fill();
+
+            // --- Side tongues (smooth sway, not random flicker) ---
+            if (pw > 0.2) {
+                var tongueCount = 1 + Math.floor(pw * 2);
+                for (var ti = 0; ti < tongueCount; ti++) {
+                    var side = (ti % 2 === 0) ? -1 : 1;
+                    var tSeed = ti * 3.7;
+                    var tongueH = (12 + flameNoise(s.time * 0.06, tSeed + 1) * 20) * pw;
+                    var tongueW = 3 + Math.abs(flameNoise(s.time * 0.05, tSeed + 2)) * 3;
+                    var tongueX = centerX + side * (8 + Math.abs(flameNoise(s.time * 0.04, tSeed + 3)) * (5 + pw * 6)) + tilt * 0.3;
+                    var tongueY = fby - (0.1 + Math.abs(flameNoise(s.time * 0.05, tSeed + 4)) * 0.3) * fh;
+                    ctx.beginPath();
+                    ctx.moveTo(tongueX - tongueW / 2, tongueY);
+                    ctx.quadraticCurveTo(
+                        tongueX + side * (2 + Math.abs(flameNoise(s.time * 0.07, tSeed + 5)) * 3) + tilt * 0.2,
+                        tongueY - tongueH,
+                        tongueX + tongueW / 2, tongueY
+                    );
+                    var tongueG = Math.floor(130 + Math.abs(flameNoise(s.time * 0.06, tSeed + 6)) * 80);
+                    ctx.fillStyle = 'rgba(255,' + tongueG + ',0,0.25)';
+                    ctx.fill();
+                }
+            }
+
+            // --- Embers / sparks ---
+            for (i = 0; i < s.embers.length; i++) {
+                var em = s.embers[i];
+                var emFlicker = 0.6 + 0.4 * Math.sin(s.time * 0.5 + i * 7.3);
+                var emAlpha = em.life * emFlicker;
+                ctx.beginPath();
+                ctx.arc(em.x, em.y, em.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,' + Math.floor(180 + 75 * Math.sin(s.time * 0.3 + i * 4.1)) + ',50,' + emAlpha + ')';
+                ctx.fill();
+            }
         }
 
-        // --- 2. Draw Steam ---
-        state.steam.forEach(s => {
-            const globalX = centerX - (tubeWidth/2) + s.x;
-            const globalY = tubeTop + s.y;
+        // Steam
+        for (i = 0; i < s.steam.length; i++) {
+            var st = s.steam[i];
             ctx.beginPath();
-            ctx.arc(globalX, globalY, s.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 255, 255, ${s.life * 0.3})`;
+            ctx.arc(centerX - tubeW / 2 + st.x, tubeTop + st.y, st.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(220,230,240,' + (st.life * 0.4) + ')';
             ctx.fill();
-        });
+        }
 
-        // --- 3. Draw Liquid ---
-        const tRatio = Math.min(1, Math.max(0, (state.currentTemp - 20) / 80));
-        const r = Math.floor(40 + (215 * tRatio));
-        const g = Math.floor(150 - (100 * tRatio));
-        const b = Math.floor(255 - (200 * tRatio));
-        
+        // === WATER SIMULATION ===
+        var tRatio2 = Math.min(1, Math.max(0, (s.currentTemp - 20) / 80));
+        // Cool: clear blue (60,150,255) → Hot: deep red-orange (230,60,40)
+        var cr = Math.floor(60 + 170 * tRatio2);
+        var cg = Math.floor(150 - 90 * tRatio2);
+        var cb = Math.floor(255 - 215 * tRatio2);
+
+        var tubeL = centerX - tubeW / 2;
+        var tubeR = centerX + tubeW / 2;
+        var tubeBot = tubeTop + tubeH;
+        var surfaceY = tubeTop + 38; // base water-level line
+
         ctx.save();
         ctx.beginPath();
-        ctx.roundRect(centerX - tubeWidth/2, tubeTop, tubeWidth, tubeHeight, [0, 0, 30, 30]);
+        tubeOpenPath(ctx, tubeL, tubeTop, tubeW, tubeH, 30);
+        // Close the clip by connecting the top (invisible, just for clipping)
+        ctx.closePath();
         ctx.clip();
 
-        // Liquid Path with Wave
-        ctx.beginPath();
-        const liquidTopY = tubeTop + 40;
-        ctx.moveTo(centerX - tubeWidth/2, tubeHeight + tubeTop);
-        ctx.lineTo(centerX - tubeWidth/2, liquidTopY);
-        
-        // Wave
-        for (let x = 0; x <= tubeWidth; x+=2) {
-            const waveY = liquidTopY + Math.sin((x + state.wavePhase * 20) * 0.1) * (2 + (state.burnerPower/100)*2);
-            ctx.lineTo(centerX - tubeWidth/2 + x, waveY);
+        // --- Multi-layer surface wave ---
+        // Gentle sloshing only — bubble domes are the real disturbance at high temps
+        var waveAmp = 1.0 + pw * 1.5; // subtle base sloshing, NOT temperature-driven
+        function waterSurfaceY(localX) {
+            var nx = localX / tubeW; // 0..1 across tube
+            var w1 = Math.sin((localX + s.wavePhase * 22) * 0.12) * waveAmp;
+            var w2 = Math.sin((localX * 1.7 - s.wavePhase * 15) * 0.18) * waveAmp * 0.4;
+            var w3 = Math.sin((localX * 3.1 + s.wavePhase * 30) * 0.09) * waveAmp * 0.15;
+            // Meniscus: curve up at edges (surface tension)
+            var meniscus = 3.0 * Math.pow(Math.abs(nx - 0.5) * 2, 2.5);
+
+            // Ripples from bubble pops — localised dip then outward ring
+            var ripple = 0;
+            for (var ri = 0; ri < s.surfaceRipples.length; ri++) {
+                var rp = s.surfaceRipples[ri];
+                var dist = Math.abs(localX - rp.x);
+                // Tight Gaussian centred on pop site
+                var sigma = rp.spread + 2;
+                var envelope = Math.exp(-dist * dist / (2 * sigma * sigma));
+                // Young ripples dip down (crater), then ring outward
+                var phase = dist * 0.35 - rp.age * 5;
+                ripple += Math.cos(phase) * rp.amp * envelope;
+            }
+
+            // Dome/bulge from bubbles approaching the surface
+            // This is the PRIMARY surface disturbance at high temps — realistic
+            // hemispherical lumps where each bubble pushes the surface up
+            var dome = 0;
+            for (var bi = 0; bi < s.bubbles.length; bi++) {
+                var bub = s.bubbles[bi];
+                if (bub.y < 65) {
+                    // How close to breaking the surface (0=far, 1=at surface)
+                    var proximity = Math.max(0, 1 - (bub.y - 38) / 27);
+                    proximity = proximity * proximity; // ease-in: ramps up sharply near surface
+                    var bdist = localX - bub.x;
+                    // Dome width matches bubble diameter
+                    var bRadius = bub.r * (1.5 + proximity * 1.5);
+                    var gauss = Math.exp(-bdist * bdist / (2 * bRadius * bRadius));
+                    // Height: proportional to bubble size and proximity
+                    dome += proximity * (bub.r * 1.2) * gauss;
+                }
+            }
+
+            return surfaceY + w1 + w2 + w3 - meniscus + ripple - dome;
         }
-        
-        ctx.lineTo(centerX + tubeWidth/2, tubeHeight + tubeTop);
+
+        // Main water body fill
+        ctx.beginPath();
+        ctx.moveTo(tubeL, tubeBot);
+        ctx.lineTo(tubeL, waterSurfaceY(0));
+        for (var x = 0; x <= tubeW; x += 1) {
+            ctx.lineTo(tubeL + x, waterSurfaceY(x));
+        }
+        ctx.lineTo(tubeR, tubeBot);
         ctx.closePath();
 
-        // Gradient Fill
-        const grad = ctx.createLinearGradient(centerX, tubeTop, centerX, tubeTop + tubeHeight);
-        grad.addColorStop(0, `rgb(${r},${g},${b})`);
-        grad.addColorStop(1, `rgb(${Math.max(0, r-50)},${Math.max(0, g-50)},${Math.max(0, b-50)})`);
-        ctx.fillStyle = grad;
+        // Depth gradient — lighter at surface, darker at bottom
+        var wGrad = ctx.createLinearGradient(centerX, surfaceY - 5, centerX, tubeBot);
+        wGrad.addColorStop(0, 'rgba(' + cr + ',' + cg + ',' + cb + ',0.75)');
+        wGrad.addColorStop(0.4, 'rgba(' + cr + ',' + cg + ',' + cb + ',0.85)');
+        wGrad.addColorStop(1, 'rgba(' + Math.max(0,cr-60) + ',' + Math.max(0,cg-40) + ',' + Math.max(0,cb-60) + ',0.95)');
+        ctx.fillStyle = wGrad;
         ctx.fill();
 
-        // Bubbles
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        state.bubbles.forEach(b => {
-          const globalX = centerX - (tubeWidth/2) + b.x - 25; 
-          const globalY = tubeTop + b.y;
-          ctx.beginPath();
-          ctx.arc(globalX, globalY, b.r, 0, Math.PI * 2);
-          ctx.fill();
-          // Bubble highlight
-          ctx.beginPath();
-          ctx.arc(globalX - b.r*0.3, globalY - b.r*0.3, b.r*0.2, 0, Math.PI*2);
-          ctx.fillStyle = 'rgba(255,255,255,0.8)';
-          ctx.fill();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        });
+        // --- Caustic light patterns (shimmering refraction) ---
+        ctx.save();
+        ctx.globalAlpha = 0.08 + tRatio2 * 0.07;
+        for (var cy = surfaceY + 5; cy < tubeBot - 10; cy += 12) {
+            for (var cx = 0; cx < tubeW; cx += 10) {
+                var cVal = Math.sin(cx * 0.3 + cy * 0.2 + s.causticPhase * 2) *
+                           Math.cos(cx * 0.15 - cy * 0.25 + s.causticPhase * 1.3);
+                if (cVal > 0.3) {
+                    var cSize = cVal * 6;
+                    ctx.fillStyle = 'rgba(255,255,255,' + (cVal * 0.5) + ')';
+                    ctx.beginPath();
+                    ctx.ellipse(tubeL + cx, cy, cSize, cSize * 0.6, s.causticPhase * 0.5 + cx, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        ctx.restore();
+
+        // --- Heat shimmer (subtle vertical distortion lines when hot) ---
+        if (tRatio2 > 0.3) {
+            ctx.save();
+            ctx.globalAlpha = (tRatio2 - 0.3) * 0.15;
+            ctx.strokeStyle = 'rgba(255,200,150,0.4)';
+            ctx.lineWidth = 1;
+            for (var hx = 5; hx < tubeW - 5; hx += 8) {
+                ctx.beginPath();
+                for (var hy = surfaceY + 10; hy < tubeBot - 15; hy += 3) {
+                    var dx = Math.sin(hy * 0.15 + s.time * 0.08 + hx * 0.5) * (1.5 + tRatio2 * 2);
+                    if (hy === surfaceY + 10) ctx.moveTo(tubeL + hx + dx, hy);
+                    else ctx.lineTo(tubeL + hx + dx, hy);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // --- Convection current particles ---
+        for (i = 0; i < s.convection.length; i++) {
+            var cv = s.convection[i];
+            var cvx = tubeL + cv.x;
+            var cvy = tubeTop + cv.y;
+            ctx.beginPath();
+            ctx.arc(cvx, cvy, cv.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (cv.life * 0.2) + ')';
+            ctx.fill();
+        }
+
+        // --- Bubbles (inside water) ---
+        for (i = 0; i < s.bubbles.length; i++) {
+            var bb = s.bubbles[i];
+            var bx = tubeL + bb.x;
+            var by = tubeTop + bb.y;
+            // Bubble body — semi-transparent
+            ctx.beginPath();
+            ctx.arc(bx, by, bb.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (bb.opacity * 0.35) + ')';
+            ctx.fill();
+            // Rim
+            ctx.strokeStyle = 'rgba(255,255,255,' + (bb.opacity * 0.5) + ')';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+            // Specular highlight
+            ctx.beginPath();
+            ctx.arc(bx - bb.r * 0.3, by - bb.r * 0.3, bb.r * 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (bb.opacity * 0.8) + ')';
+            ctx.fill();
+        }
+
+        // --- Pop effects at surface ---
+        for (i = 0; i < s.pops.length; i++) {
+            var pop = s.pops[i];
+            var ppx = tubeL + pop.x;
+            var ppy = tubeTop + pop.y;
+            ctx.beginPath();
+            ctx.arc(ppx, ppy, pop.r * (2 - pop.life), 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,' + (pop.life * 0.6) + ')';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // --- Surface highlight line (bright edge along water top) ---
+        ctx.beginPath();
+        ctx.moveTo(tubeL + 3, waterSurfaceY(3));
+        for (var sx = 3; sx <= tubeW - 3; sx += 1) {
+            ctx.lineTo(tubeL + sx, waterSurfaceY(sx));
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Subtle second highlight (thin bright line slightly below)
+        ctx.beginPath();
+        ctx.moveTo(tubeL + 6, waterSurfaceY(6) + 2);
+        for (var sx2 = 6; sx2 <= tubeW - 6; sx2 += 1) {
+            ctx.lineTo(tubeL + sx2, waterSurfaceY(sx2) + 2);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         ctx.restore();
 
-        // --- 4. Draw Glass Tube Outline ---
+        // --- Splashing water droplets (above tube) ---
+        var tubeL2 = centerX - tubeW / 2;
+        for (i = 0; i < s.splashes.length; i++) {
+            var sp = s.splashes[i];
+            var spx = tubeL2 + sp.x;
+            var spy = tubeTop + sp.y;
+            var spAlpha = sp.life * 0.8;
+            // Droplet body
+            ctx.beginPath();
+            ctx.arc(spx, spy, sp.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + spAlpha + ')';
+            ctx.fill();
+            // Tiny highlight
+            ctx.beginPath();
+            ctx.arc(spx - sp.r * 0.25, spy - sp.r * 0.25, sp.r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (spAlpha * 0.7) + ')';
+            ctx.fill();
+        }
+
+        // --- Escaping bubbles (above tube) ---
+        for (i = 0; i < s.escapeBubbles.length; i++) {
+            var eb = s.escapeBubbles[i];
+            var ebx = tubeL2 + eb.x;
+            var eby = tubeTop + eb.y;
+            var ebAlpha = eb.life;
+            // Thin bubble shell
+            ctx.beginPath();
+            ctx.arc(ebx, eby, eb.r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(200,220,255,' + (ebAlpha * 0.6) + ')';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+            // Iridescent fill
+            ctx.fillStyle = 'rgba(200,230,255,' + (ebAlpha * 0.1) + ')';
+            ctx.fill();
+            // Specular highlight
+            ctx.beginPath();
+            ctx.arc(ebx - eb.r * 0.3, eby - eb.r * 0.3, eb.r * 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,' + (ebAlpha * 0.5) + ')';
+            ctx.fill();
+        }
+
+        // Glass tube outline (open top — U-shape)
         ctx.beginPath();
-        ctx.roundRect(centerX - tubeWidth/2, tubeTop, tubeWidth, tubeHeight, [0, 0, 30, 30]);
+        tubeOpenPath(ctx, centerX - tubeW / 2, tubeTop, tubeW, tubeH, 30);
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
         ctx.stroke();
 
-        // Highlights
+        // Tube rim / lip at the open top (slight flare)
         ctx.beginPath();
-        ctx.moveTo(centerX - tubeWidth/2 + 8, tubeTop + 10);
-        ctx.lineTo(centerX - tubeWidth/2 + 8, tubeTop + tubeHeight - 20);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.moveTo(centerX - tubeW / 2 - 3, tubeTop);
+        ctx.lineTo(centerX - tubeW / 2, tubeTop + 4);
+        ctx.moveTo(centerX + tubeW / 2 + 3, tubeTop);
+        ctx.lineTo(centerX + tubeW / 2, tubeTop + 4);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Glass highlights
+        ctx.beginPath();
+        ctx.moveTo(centerX - tubeW / 2 + 8, tubeTop - 2);
+        ctx.lineTo(centerX - tubeW / 2 + 8, tubeTop + tubeH - 20);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.lineWidth = 5;
         ctx.lineCap = 'round';
         ctx.stroke();
-        
         ctx.beginPath();
-        ctx.moveTo(centerX + tubeWidth/2 - 8, tubeTop + 20);
-        ctx.lineTo(centerX + tubeWidth/2 - 8, tubeTop + tubeHeight - 40);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.moveTo(centerX + tubeW / 2 - 8, tubeTop - 2);
+        ctx.lineTo(centerX + tubeW / 2 - 8, tubeTop + tubeH - 40);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // --- 5. Burner Base ---
+        // Burner base
         ctx.fillStyle = '#475569';
-        ctx.fillRect(centerX - 12, tubeTop + tubeHeight + 25, 24, 35);
+        ctx.fillRect(centerX - 12, tubeTop + tubeH + 25, 24, 35);
         ctx.beginPath();
-        ctx.moveTo(centerX - 35, tubeTop + tubeHeight + 60);
-        ctx.lineTo(centerX + 35, tubeTop + tubeHeight + 60);
-        ctx.lineTo(centerX + 15, tubeTop + tubeHeight + 35);
-        ctx.lineTo(centerX - 15, tubeTop + tubeHeight + 35);
+        ctx.moveTo(centerX - 35, tubeTop + tubeH + 60);
+        ctx.lineTo(centerX + 35, tubeTop + tubeH + 60);
+        ctx.lineTo(centerX + 15, tubeTop + tubeH + 35);
+        ctx.lineTo(centerX - 15, tubeTop + tubeH + 35);
         ctx.fill();
 
-        // --- 6. Draw Wind Particles ---
-        ctx.strokeStyle = 'rgba(200, 230, 255, 0.4)';
+        // Wind particles
+        ctx.strokeStyle = 'rgba(200,230,255,0.4)';
         ctx.lineWidth = 2;
-        state.windParticles.forEach(w => {
+        for (i = 0; i < s.windParticles.length; i++) {
+            var w = s.windParticles[i];
             ctx.beginPath();
             ctx.moveTo(w.x, w.y);
-            // Draw a curvy line
-            ctx.quadraticCurveTo(w.x + w.length/2, w.y - 5, w.x + w.length, w.y);
+            ctx.quadraticCurveTo(w.x + w.len / 2, w.y - 5, w.x + w.len, w.y);
             ctx.stroke();
-        });
+        }
 
-        // --- 7. HUD Text ---
-        // Temp Box
-        ctx.font = "bold 24px monospace";
-        ctx.textAlign = "right";
-        ctx.fillStyle = state.currentTemp > 80 ? "#ef4444" : "#3b82f6";
-        ctx.fillText(`${state.currentTemp.toFixed(1)}°C`, canvas.width - 20, 40);
-        
-        ctx.font = "12px sans-serif";
-        ctx.fillStyle = "#94a3b8";
-        ctx.fillText("TEMPERATURE", canvas.width - 20, 55);
+        // HUD text — use smoothed display values so numbers are readable
+        s.displayTemp += (s.currentTemp - s.displayTemp) * 0.08;
+        s.displayPower += (s.burnerPower - s.displayPower) * 0.08;
 
-        // Power Box
-        ctx.font = "bold 20px monospace";
-        ctx.fillStyle = "#f97316";
-        ctx.fillText(`${Math.round(state.burnerPower)}%`, canvas.width - 20, 85);
-        ctx.font = "12px sans-serif";
-        ctx.fillStyle = "#94a3b8";
-        ctx.fillText("BURNER POWER", canvas.width - 20, 100);
+        ctx.font = 'bold 24px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = s.displayTemp > 80 ? '#ef4444' : '#3b82f6';
+        ctx.fillText(s.displayTemp.toFixed(1) + '\u00B0C', W - 20, 40);
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('TEMPERATURE', W - 20, 55);
 
-        // Env Box (Wind/Sun)
-        const envY = 280;
-        // Wind Bar
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = "10px sans-serif";
-        ctx.fillText("WIND", canvas.width - 20, envY);
-        ctx.fillStyle = "#cbd5e1";
-        ctx.fillRect(canvas.width - 80, envY + 5, 60, 4);
-        ctx.fillStyle = "#3b82f6";
-        ctx.fillRect(canvas.width - 80, envY + 5, 60 * state.windLevel, 4);
+        ctx.font = 'bold 20px monospace';
+        ctx.fillStyle = '#f97316';
+        ctx.fillText(Math.round(s.displayPower) + '%', W - 20, 85);
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('BURNER POWER', W - 20, 100);
 
-        // Sun Bar
-        ctx.fillStyle = "#94a3b8";
-        ctx.fillText("SUN", canvas.width - 20, envY + 25);
-        ctx.fillStyle = "#cbd5e1";
-        ctx.fillRect(canvas.width - 80, envY + 30, 60, 4);
-        ctx.fillStyle = "#fbbf24";
-        ctx.fillRect(canvas.width - 80, envY + 30, 60 * state.sunLevel, 4);
+        var ey = 280;
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px sans-serif';
+        ctx.fillText('WIND', W - 20, ey);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(W - 80, ey + 5, 60, 4);
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(W - 80, ey + 5, 60 * s.windLevel, 4);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('SUN', W - 20, ey + 25);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(W - 80, ey + 30, 60, 4);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(W - 80, ey + 30, 60 * s.sunLevel, 4);
 
-      }, []);
+        // --- Graph ---
+        var gW = graphCanvas.width;
+        var gH = graphCanvas.height;
+        gCtx.clearRect(0, 0, gW, gH);
+        if (s.history.length > 0) {
+            var bw = gW / MAX_HISTORY;
+            for (i = 0; i < s.history.length; i++) {
+                var pt = s.history[i];
+                var px = i * bw;
+                var sh = (pt.setpoint / 120) * gH;
+                gCtx.fillStyle = 'rgba(187,247,208,0.5)';
+                gCtx.fillRect(px, gH - sh, bw, sh);
+                var th = Math.min(gH, (pt.temp / 120) * gH);
+                gCtx.fillStyle = pt.temp > pt.setpoint ? '#f87171' : '#60a5fa';
+                gCtx.fillRect(px, gH - th, bw, th);
+            }
+        }
+        gCtx.strokeStyle = '#e2e8f0';
+        gCtx.lineWidth = 1;
+        gCtx.beginPath();
+        gCtx.moveTo(0, gH / 2);
+        gCtx.lineTo(gW, gH / 2);
+        gCtx.stroke();
+    }
 
-      // --- Animation Loop ---
-      useEffect(() => {
-        const loop = () => {
-          updatePhysics();
-          draw();
-          requestRef.current = requestAnimationFrame(loop);
-        };
-        requestRef.current = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(requestRef.current);
-      }, [updatePhysics, draw]);
-
-      // --- Helper to Reset ---
-      const handleReset = () => {
-        simState.current.currentTemp = 20;
-        simState.current.integral = 0;
-        simState.current.lastError = 0;
-        simState.current.history = [];
-        simState.current.bubbles = [];
-      };
-
-      return (
-        <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 bg-slate-50 rounded-xl shadow-lg font-sans text-slate-700">
-          
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6 w-full border-b pb-4 border-slate-200">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Settings className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">PID Temperature Controller</h1>
-              <p className="text-sm text-slate-500">Tune the loop to stabilize the liquid temperature.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-            
-            {/* Left Column: Visuals */}
-            <div className="flex flex-col items-center justify-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              
-              <canvas 
-                ref={canvasRef} 
-                width={300} 
-                height={350} 
-                className="w-full max-w-[300px]"
-              />
-
-              <div className="flex gap-4 mt-4">
-                <button 
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition"
-                >
-                  <Play className={`w-4 h-4 ${isPlaying ? 'fill-current' : ''}`} />
-                  {isPlaying ? 'Pause' : 'Resume'}
-                </button>
-                <button 
-                  onClick={handleReset}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Right Column: Controls & Graph */}
-            <div className="flex flex-col gap-6">
-              
-              {/* Setpoint Slider */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                <div className="flex justify-between items-center mb-4">
-                  <label className="font-semibold flex items-center gap-2">
-                    <Thermometer className="w-4 h-4 text-green-600" />
-                    Target Temperature (Setpoint)
-                  </label>
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-mono font-bold">
-                    {targetTemp}°C
-                  </span>
-                </div>
-                <input 
-                  type="range" 
-                  min="20" 
-                  max="110" 
-                  value={targetTemp} 
-                  onChange={(e) => setTargetTemp(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-                />
-                <div className="flex justify-between text-xs text-slate-400 mt-2">
-                  <span>20°C (Room)</span>
-                  <span>100°C (Boil)</span>
-                  <span>110°C</span>
-                </div>
-              </div>
-
-              {/* PID Sliders */}
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-                <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                  <Settings className="w-4 h-4" />
-                  PID Constants
-                </h3>
-                
-                {/* Kp */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-slate-600">Proportional (Kp)</span>
-                    <span className="font-mono text-slate-500">{kp.toFixed(1)}</span>
-                  </div>
-                  <input 
-                    type="range" min="0" max="10" step="0.1" 
-                    value={kp} onChange={(e) => setKp(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-
-                {/* Ki */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-slate-600">Integral (Ki)</span>
-                    <span className="font-mono text-slate-500">{ki.toFixed(2)}</span>
-                  </div>
-                  <input 
-                    type="range" min="0" max="0.5" step="0.01" 
-                    value={ki} onChange={(e) => setKi(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                  />
-                </div>
-
-                {/* Kd */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-slate-600">Derivative (Kd)</span>
-                    <span className="font-mono text-slate-500">{kd.toFixed(1)}</span>
-                  </div>
-                  <input 
-                    type="range" min="0" max="100" step="1" 
-                    value={kd} onChange={(e) => setKd(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
-                  />
-                </div>
-              </div>
-
-              {/* Real-time Graph */}
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 h-40 flex items-end justify-between relative overflow-hidden">
-                 <div className="absolute top-2 left-2 text-xs font-bold text-slate-400">Temperature History</div>
-                 <div className="flex w-full h-full items-end gap-[1px]">
-                   {simState.current.history.map((pt, i) => (
-                     <div key={i} className="flex-1 flex flex-col justify-end h-full group relative">
-                        <div 
-                            className="w-full bg-green-200 opacity-50 absolute bottom-0"
-                            style={{ height: `${(pt.setpoint / 120) * 100}%`, marginBottom: '-1px' }}
-                        />
-                        <div 
-                            className={`w-full ${pt.temp > pt.setpoint ? 'bg-red-400' : 'bg-blue-400'} rounded-t-sm transition-all duration-75`}
-                            style={{ height: `${Math.min(100, (pt.temp / 120) * 100)}%` }}
-                        />
-                     </div>
-                   ))}
-                 </div>
-                 <div className="absolute w-full border-t border-slate-200 top-1/2 left-0 pointer-events-none"></div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<PIDLab />);
+    // --- Main Loop ---
+    function loop() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
