@@ -90,6 +90,13 @@
           </div>
           <input id="kdSlider" type="range" min="0" max="100" step="1" value="50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-600"/>
         </div>
+        <div class="pt-3 mt-1 border-t border-slate-100">
+          <button id="btnAutoTune" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 transition font-semibold text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span id="btnAutoTuneLabel">Auto-Tune PID</span>
+          </button>
+          <p id="autoTuneHint" class="text-xs text-slate-400 mt-2 text-center">Automatically finds optimal Kp, Ki, Kd for the current setpoint using relay feedback.</p>
+        </div>
       </div>
 
       <!-- Graph -->
@@ -124,9 +131,30 @@
     var kdSlider = document.getElementById('kdSlider');
     var kdLabel = document.getElementById('kdLabel');
 
+    var btnAutoTune = document.getElementById('btnAutoTune');
+    var btnAutoTuneLabel = document.getElementById('btnAutoTuneLabel');
+    var autoTuneHint = document.getElementById('autoTuneHint');
+
     var isPlaying = true;
     var targetTemp = 60;
     var kp = 2.0, ki = 0.05, kd = 50.0;
+
+    // Auto-tune state (relay feedback / Ziegler-Nichols)
+    var autoTune = {
+        active: false,
+        phase: 'idle',   // 'idle' | 'heat-up' | 'relay' | 'done'
+        relayHigh: 80,   // burner % when below setpoint
+        relayLow: 0,     // burner % when above setpoint
+        lastCross: 0,    // time of last setpoint crossing
+        crossCount: 0,   // number of crossings detected
+        periods: [],     // measured half-periods
+        peaks: [],       // measured peak temperatures
+        valleys: [],     // measured valley temperatures
+        tracking: 'none',// 'up' | 'down' | 'none'
+        peakVal: -Infinity,
+        valleyVal: Infinity,
+        message: ''
+    };
 
     var sim = {
         currentTemp: 20,
@@ -208,7 +236,84 @@
         sim.causticPhase = 0;
         sim.displayTemp = 20;
         sim.displayPower = 0;
+        if (autoTune.active) stopAutoTune('Reset');
     });
+
+    // --- Auto-Tune toggle ---
+    btnAutoTune.addEventListener('click', function() {
+        if (autoTune.active) {
+            // Cancel auto-tune
+            stopAutoTune('Cancelled');
+        } else {
+            startAutoTune();
+        }
+    });
+
+    function startAutoTune() {
+        autoTune.active = true;
+        autoTune.phase = 'heat-up';
+        autoTune.crossCount = 0;
+        autoTune.periods = [];
+        autoTune.peaks = [];
+        autoTune.valleys = [];
+        autoTune.lastCross = sim.time;
+        autoTune.tracking = 'none';
+        autoTune.peakVal = -Infinity;
+        autoTune.valleyVal = Infinity;
+        autoTune.message = 'Heating to setpoint\u2026';
+        // Reset integral so the relay starts clean
+        sim.integral = 0;
+        sim.lastError = 0;
+        btnAutoTune.classList.remove('bg-amber-50', 'text-amber-700', 'border-amber-200', 'hover:bg-amber-100');
+        btnAutoTune.classList.add('bg-red-50', 'text-red-700', 'border-red-200', 'hover:bg-red-100');
+        btnAutoTuneLabel.textContent = 'Cancel Auto-Tune';
+        autoTuneHint.textContent = 'Running\u2026 oscillating around setpoint to measure response.';
+        // Disable PID sliders during auto-tune
+        kpSlider.disabled = true;
+        kiSlider.disabled = true;
+        kdSlider.disabled = true;
+        kpSlider.classList.add('opacity-40');
+        kiSlider.classList.add('opacity-40');
+        kdSlider.classList.add('opacity-40');
+    }
+
+    function stopAutoTune(reason) {
+        autoTune.active = false;
+        autoTune.phase = 'idle';
+        autoTune.message = reason || '';
+        btnAutoTune.classList.remove('bg-red-50', 'text-red-700', 'border-red-200', 'hover:bg-red-100');
+        btnAutoTune.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200', 'hover:bg-amber-100');
+        btnAutoTuneLabel.textContent = 'Auto-Tune PID';
+        autoTuneHint.textContent = reason || 'Automatically finds optimal Kp, Ki, Kd for the current setpoint using relay feedback.';
+        kpSlider.disabled = false;
+        kiSlider.disabled = false;
+        kdSlider.disabled = false;
+        kpSlider.classList.remove('opacity-40');
+        kiSlider.classList.remove('opacity-40');
+        kdSlider.classList.remove('opacity-40');
+    }
+
+    function applyAutoTuneGains(ku, tu) {
+        // Ziegler-Nichols PID formula
+        var newKp = 0.6 * ku;
+        var newKi = 1.2 * ku / tu;
+        var newKd = 0.075 * ku * tu;
+        // Clamp to slider ranges
+        newKp = Math.max(0, Math.min(10, Math.round(newKp * 10) / 10));
+        newKi = Math.max(0, Math.min(0.5, Math.round(newKi * 100) / 100));
+        newKd = Math.max(0, Math.min(100, Math.round(newKd)));
+        kp = newKp; ki = newKi; kd = newKd;
+        // Sync sliders
+        kpSlider.value = kp;
+        kpLabel.textContent = kp.toFixed(1);
+        kiSlider.value = ki;
+        kiLabel.textContent = ki.toFixed(2);
+        kdSlider.value = kd;
+        kdLabel.textContent = kd.toFixed(1);
+        // Reset integral for clean start with new gains
+        sim.integral = 0;
+        sim.lastError = 0;
+    }
 
     // Portable rounded rectangle path
     function rrect(c, x, y, w, h, radii) {
@@ -257,11 +362,107 @@
         var derivative = (error - s.lastError) / DT;
         s.lastError = error;
 
-        var output = (kp * error) + (ki * s.integral) + (kd * derivative);
-        var targetPower = Math.max(0, Math.min(100, output));
+        var targetPower;
+
+        if (autoTune.active && isPlaying) {
+            // --- Auto-tune relay control ---
+            var at = autoTune;
+            if (at.phase === 'heat-up') {
+                // Phase 1: drive to setpoint with full power
+                targetPower = at.relayHigh;
+                if (s.currentTemp >= targetTemp - 1) {
+                    at.phase = 'relay';
+                    at.lastCross = s.time;
+                    at.tracking = 'up';
+                    at.peakVal = s.currentTemp;
+                    at.message = 'Relay cycling (0/' + 4 + ' crossings)\u2026';
+                }
+            } else if (at.phase === 'relay') {
+                // Phase 2: relay bang-bang around setpoint
+                var above = s.currentTemp >= targetTemp;
+                targetPower = above ? at.relayLow : at.relayHigh;
+
+                // Track peaks and valleys
+                if (at.tracking === 'up') {
+                    if (s.currentTemp > at.peakVal) at.peakVal = s.currentTemp;
+                    if (above && s.currentTemp < at.peakVal - 0.2) {
+                        // Just passed a peak, record it
+                        at.peaks.push(at.peakVal);
+                        at.tracking = 'down';
+                        at.valleyVal = s.currentTemp;
+                    }
+                } else if (at.tracking === 'down') {
+                    if (s.currentTemp < at.valleyVal) at.valleyVal = s.currentTemp;
+                    if (!above && s.currentTemp > at.valleyVal + 0.2) {
+                        // Just passed a valley, record it
+                        at.valleys.push(at.valleyVal);
+                        at.tracking = 'up';
+                        at.peakVal = s.currentTemp;
+                    }
+                }
+
+                // Detect zero crossings (temp crosses setpoint)
+                var crossed = false;
+                if (above && at.tracking === 'up' && at.crossCount === 0) crossed = true;
+                // Detect each time we cross from below to above or above to below
+                if (at.crossCount > 0) {
+                    // Use change in error sign
+                    var prevAbove = (s.lastError + error) < error; // approximate
+                }
+                // Simpler crossing: just count peak+valley pairs
+                var totalPV = at.peaks.length + at.valleys.length;
+                if (totalPV > at.crossCount) {
+                    if (totalPV > 1) {
+                        // Record half-period
+                        at.periods.push(s.time - at.lastCross);
+                        at.lastCross = s.time;
+                    } else {
+                        at.lastCross = s.time;
+                    }
+                    at.crossCount = totalPV;
+                    at.message = 'Relay cycling (' + Math.floor(at.crossCount / 2) + '/' + 2 + ' cycles)\u2026';
+                }
+
+                // Need at least 2 full cycles (4 half-periods) to calculate
+                if (at.peaks.length >= 2 && at.valleys.length >= 2 && at.periods.length >= 3) {
+                    // Calculate ultimate gain and period
+                    var avgPeak = 0, avgValley = 0;
+                    for (var pi = 0; pi < at.peaks.length; pi++) avgPeak += at.peaks[pi];
+                    avgPeak /= at.peaks.length;
+                    for (var vi = 0; vi < at.valleys.length; vi++) avgValley += at.valleys[vi];
+                    avgValley /= at.valleys.length;
+
+                    var amplitude = (avgPeak - avgValley) / 2;
+                    // Average period from half-periods (combine pairs)
+                    var avgPeriod = 0;
+                    for (var ti = 0; ti < at.periods.length; ti++) avgPeriod += at.periods[ti];
+                    avgPeriod = (avgPeriod / at.periods.length) * 2; // full period from half-periods
+
+                    if (amplitude > 0.1) {
+                        var d = at.relayHigh - at.relayLow; // relay amplitude
+                        var ku = (4 * d) / (Math.PI * amplitude);
+                        var tu = avgPeriod; // in sim ticks
+                        applyAutoTuneGains(ku, tu);
+                        stopAutoTune('\u2705 Tuned! Kp=' + kp.toFixed(1) + ' Ki=' + ki.toFixed(2) + ' Kd=' + kd.toFixed(1));
+                    } else {
+                        stopAutoTune('\u26A0 Oscillation too small. Try a different setpoint.');
+                    }
+                }
+
+                // Safety timeout: if it takes too long (5000 ticks), abort
+                if (s.time - at.lastCross > 5000) {
+                    stopAutoTune('\u26A0 Timed out. System may be too slow for this setpoint.');
+                }
+            }
+            if (targetPower === undefined) targetPower = 0;
+        } else {
+            // Normal PID control
+            var output = (kp * error) + (ki * s.integral) + (kd * derivative);
+            targetPower = Math.max(0, Math.min(100, output));
+        }
 
         // Slew-rate limit: burner can only ramp up/down at a realistic rate
-        var maxRamp = 1.5; // max % change per physics tick
+        var maxRamp = autoTune.active ? 4.0 : 1.5; // faster during auto-tune relay
         var diff = targetPower - s.burnerPower;
         if (diff > maxRamp) diff = maxRamp;
         if (diff < -maxRamp) diff = -maxRamp;
@@ -1048,6 +1249,20 @@
         ctx.font = '12px sans-serif';
         ctx.fillStyle = '#94a3b8';
         ctx.fillText('BURNER POWER', W - 20, 100);
+
+        // Auto-tune status indicator on canvas
+        if (autoTune.active) {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 11px sans-serif';
+            var atPulse = 0.7 + 0.3 * Math.sin(s.time * 0.15);
+            ctx.fillStyle = 'rgba(245,158,11,' + atPulse + ')';
+            ctx.fillText('\u25CF AUTO-TUNING', W / 2, 18);
+            ctx.font = '9px sans-serif';
+            ctx.fillStyle = 'rgba(180,130,40,0.8)';
+            ctx.fillText(autoTune.message, W / 2, 30);
+            ctx.restore();
+        }
 
         var ey = 280;
         ctx.fillStyle = '#94a3b8';
